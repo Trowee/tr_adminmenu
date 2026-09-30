@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TR Admin</title>
+    <link rel="stylesheet" href="./index.css" />
+    <link rel="stylesheet" href="./components/quickmenu/index.css" />
+    <link rel="stylesheet" href="./components/adminpanel/index.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <script src="./lib/vue.global.prod.js"></script>
+    <script src="./lib/vuex.global.prod.js"></script>
+    <script src="./utils/postNui.js"></script>
+</head>
+<body>
+    <div id="app" style="display:none">
+        <Transition name="slide">
+            <div v-if="notification && notification.text" class="notification-toast" :class="notification.type">
+                <i
+                    :class="notification.type === 'success' ? 'fas fa-check-circle' : notification.type === 'error' ? 'fas fa-times-circle' : 'fas fa-info-circle'"></i>
+                <span>{{ notification.text }}</span>
+            </div>
+        </Transition>
+        <quickmenu v-if="showQuickMenu"></quickmenu>
+        <adminpanel v-if="showAdminPanel" :key="adminPanelKey"></adminpanel>
+        <div v-if="showDMReceiveModal" class="modal-overlay" style="background:rgba(0,0,0,0.8);z-index:9999;">
+            <div class="modal-box" style="width:500px;border:2px solid var(--accent);">
+                <div style="text-align:center;margin-bottom:20px;">
+                    <i class="fas fa-envelope-open-text"
+                        style="font-size:48px;color:var(--accent);margin-bottom:10px;"></i>
+                    <h2 style="font-size:24px;color:var(--accent-light);">{{ t('ui_dm_title') }}</h2>
+                    <p style="color:var(--text-muted);font-size:14px;">{{ dmReceiveData.admin }}</p>
+                </div>
+                <div
+                    style="background:rgba(255,255,255,0.05);padding:20px;border-radius:var(--radius-md);margin-bottom:20px;font-size:16px;line-height:1.6;color:white;text-align:center;">
+                    {{ dmReceiveData.message }}
+                </div>
+                <div class="modal-actions" style="justify-content:center;">
+                    <button class="btn-action btn-primary" @click="closeDMReceiveModal"
+                        style="padding:10px 30px;font-size:14px;">{{ t('ui_acknowledge') }}</button>
+                </div>
+            </div>
+        </div>
+        <div v-if="showWarnModal" class="modal-overlay" style="background:rgba(239,68,68,0.2);z-index:9999;">
+            <div class="modal-box"
+                style="width:500px;border:2px solid var(--danger);box-shadow:0 0 50px rgba(239,68,68,0.3);">
+                <div style="text-align:center;margin-bottom:20px;">
+                    <i class="fas fa-exclamation-triangle"
+                        style="font-size:48px;color:var(--danger);margin-bottom:10px;"></i>
+                    <h2 style="font-size:24px;color:#FCA5A5;">{{ t('ui_warn_title') }}</h2>
+                    <p style="color:var(--text-muted);font-size:14px;">Admin: {{ warnModalData.admin }}</p>
+                </div>
+                <div
+                    style="background:rgba(239,68,68,0.1);padding:20px;border-radius:var(--radius-md);margin-bottom:20px;font-size:18px;line-height:1.6;color:white;text-align:center;font-weight:600;border:1px solid rgba(239,68,68,0.3);">
+                    {{ warnModalData.reason }}
+                </div>
+                <div class="modal-actions" style="justify-content:center;">
+                    <button class="btn-action btn-danger" @click="closeWarnModal"
+                        style="padding:10px 30px;font-size:14px;">{{ t('ui_i_understand') }}</button>
+                </div>
+            </div>
+        </div>
+        <div v-if="showAnnouncementReceive" class="announcement-banner">
+            <div class="announcement-banner-inner">
+                <i class="fas fa-bullhorn" style="font-size:32px;color:#3B82F6;margin-right:18px;"></i>
+                <div style="flex:1;text-align:center;">
+                    <div style="font-size:22px;font-weight:800;color:white;margin-bottom:4px;letter-spacing:0.3px;">{{
+                        announcementData.text }}</div>
+                    <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:4px;">{{ t('ui_from') }} {{
+                        announcementData.admin }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="text/x-template" id="quickmenu-template">
+    <div class="quick-menu-overlay">
+        <div class="quick-menu" style="position:relative;">
+            <div class="qm-header">
+                <div class="qm-header-title">
+                    <div class="logo"><i class="fas fa-shield-alt" style="font-size:24px;color:var(--accent-light);"></i></div>
+                    <div>
+                        <h2>{{ t('ui_admin_menu') }}</h2>
+                        <p>{{ serverName }} - {{ t('ui_quick_actions') }}</p>
+                    </div>
+                </div>
+                <div class="qm-close" @click="closeMenu"><i class="fas fa-times"></i></div>
+            </div>
+            <div class="qm-actions-grid">
+                <div class="qm-action-btn" :class="{ disabled: !myPermissions.noclip }" @click="myPermissions.noclip && doAction('noclip')">
+                    <div class="icon purple"><i class="fas fa-bolt"></i></div>
+                    <span>{{ t('ui_qm_noclip') }}</span>
+                </div>
+                <div class="qm-action-btn" :class="{ disabled: !myPermissions.goto_player }" @click="myPermissions.goto_player && openIdPopup('goto')">
+                    <div class="icon blue"><i class="fas fa-map-marker-alt"></i></div>
+                    <span>{{ t('ui_qm_goto') }}</span>
+                </div>
+                <div class="qm-action-btn" :class="{ disabled: !myPermissions.bring }" @click="myPermissions.bring && openIdPopup('bring')">
+                    <div class="icon cyan"><i class="fas fa-user"></i></div>
+                    <span>{{ t('ui_qm_bring') }}</span>
+                </div>
+                <div class="qm-action-btn" :class="{ disabled: !myPermissions.spawn_vehicle }" @click="myPermissions.spawn_vehicle && doAction('spawnvehicle')">
+                    <div class="icon yellow"><i class="fas fa-car"></i></div>
+                    <span>{{ t('ui_qm_spawn') }}</span>
+                </div>
+                <div class="qm-action-btn" :class="{ disabled: !myPermissions.manage_vehicles }" @click="myPermissions.manage_vehicles && doAction('dv')">
+                    <div class="icon red"><i class="fas fa-trash"></i></div>
+                    <span>{{ t('ui_qm_dv') }}</span>
+                </div>
+                <div class="qm-action-btn" :class="{ disabled: !myPermissions.manage_vehicles }" @click="myPermissions.manage_vehicles && doAction('fix')">
+                    <div class="icon green"><i class="fas fa-wrench"></i></div>
+                    <span>{{ t('ui_qm_fix') }}</span>
+                </div>
+                <div class="qm-action-btn" :class="{ disabled: !myPermissions.heal }" @click="myPermissions.heal && openIdPopup('heal')">
+                    <div class="icon green"><i class="fas fa-heart"></i></div>
+                    <span>{{ t('ui_qm_heal') }}</span>
+                </div>
+                <div class="qm-action-btn" :class="{ disabled: !myPermissions.revive }" @click="myPermissions.revive && openIdPopup('revive')">
+                    <div class="icon cyan"><i class="fas fa-heartbeat"></i></div>
+                    <span>{{ t('ui_qm_revive') }}</span>
+                </div>
+                <div class="qm-action-btn" :class="{ disabled: !myPermissions.teleport }" @click="myPermissions.teleport && doAction('tpm')">
+                    <div class="icon red"><i class="fas fa-crosshairs"></i></div>
+                    <span>{{ t('ui_qm_tpm') }}</span>
+                </div>
+                <div class="qm-action-btn" :class="{ disabled: !myPermissions.kick }" @click="myPermissions.kick && openIdPopup('kick')">
+                    <div class="icon red"><i class="fas fa-user-slash"></i></div>
+                    <span>{{ t('ui_qm_kick') }}</span>
+                </div>
+                <div class="qm-action-btn" :class="{ disabled: !myPermissions.kill }" @click="myPermissions.kill && openIdPopup('kill')">
+                    <div class="icon red"><i class="fas fa-skull"></i></div>
+                    <span>{{ t('ui_qm_kill') }}</span>
+                </div>
+                <div class="qm-action-btn" :class="{ disabled: !myPermissions.send_announcement }" @click="myPermissions.send_announcement && openAnnouncementPopup()">
+                    <div class="icon blue"><i class="fas fa-bullhorn"></i></div>
+                    <span>{{ t('ui_qm_announce') }}</span>
+                </div>
+            </div>
+            <div v-if="announcementPopup" class="qm-id-popup-overlay">
+                <div class="qm-id-popup">
+                    <h3>{{ t('ui_send_announcement') }}</h3>
+                    <input class="input-field" type="text" v-model="announcementText" :placeholder="t('ui_msg_placeholder')" />
+                    <div class="qm-popup-actions">
+                        <button class="btn-action btn-ghost" @click="announcementPopup = false; announcementText = ''">{{ t('ui_cancel') }}</button>
+                        <button class="btn-action btn-primary" @click="sendQMAnnouncement" :disabled="!announcementText">{{ t('ui_send') }}</button>
+                    </div>
+                </div>
+            </div>
+            <div v-if="idPopup.show" class="qm-id-popup-overlay">
+                <div class="qm-id-popup">
+                    <h3>{{ idPopup.action }} - {{ t('ui_enter_player_id') }}</h3>
+                    <input class="input-field" type="number" v-model="idPopup.inputId" @input="lookupPlayer" :placeholder="t('ui_player_id_placeholder')" min="1" />
+                    <div v-if="foundPlayer" class="qm-player-card">
+                        <div class="avatar">
+                            <img v-if="foundPlayer.avatar" :src="foundPlayer.avatar" />
+                            <span v-else>{{ foundPlayer.name ? foundPlayer.name.charAt(0).toUpperCase() : '?' }}</span>
+                        </div>
+                        <div class="info">
+                            <h4>{{ foundPlayer.name }}</h4>
+                            <p>ID: {{ foundPlayer.id }} | {{ foundPlayer.job || 'Unemployed' }}</p>
+                        </div>
+                    </div>
+                    <p v-else-if="idPopup.inputId && idPopup.inputId.length > 0" class="no-player-text">{{ t('ui_no_player_found') }} {{ idPopup.inputId }}</p>
+                    <div class="qm-popup-actions">
+                        <button class="btn-action btn-ghost" @click="closeIdPopup">{{ t('ui_cancel') }}</button>
+                        <button class="btn-action btn-primary" @click="confirmAction" :disabled="!foundPlayer">{{ t('ui_confirm') }}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </script>
+    <script type="text/x-template" id="adminpanel-template">
+    <div class="admin-panel-overlay" @click.self="closePanel">
+        <div class="admin-panel">
+            <div class="ap-sidebar">
+                <div class="ap-sidebar-brand">
+                    <div class="brand-icon"><i class="fas fa-shield-alt" style="font-size:22px;color:var(--accent-light);"></i></div>
+                    <div>
+                        <h1>{{ serverName }}</h1>
+                        <p>{{ t('ui_admin_panel') }}</p>
+                    </div>
+                </div>
+                <div class="ap-nav">
+                    <div class="ap-nav-section">{{ t('ui_nav_main') }}</div>
+                    <div class="ap-nav-item" :class="{active: tab === 'home'}" @click="tab = 'home'" v-if="sections.home">
+                        <div class="nav-icon"><i class="fas fa-home"></i></div> {{ t('ui_nav_home') }}
+                    </div>
+                    <div class="ap-nav-item" :class="{active: tab === 'players'}" @click="tab = 'players'; selectedPlayerId = null" v-if="sections.players">
+                        <div class="nav-icon"><i class="fas fa-users"></i></div> {{ t('ui_nav_players') }}
+                    </div>
+                    <div class="ap-nav-item" :class="{active: tab === 'offline_players'}" @click="tab = 'offline_players'" v-if="sections.offline_players">
+                        <div class="nav-icon"><i class="fas fa-user-clock"></i></div> {{ t('ui_nav_offline_players') }}
+                    </div>
+                    <div class="ap-nav-item" :class="{active: tab === 'vehicles'}" @click="tab = 'vehicles'" v-if="sections.vehicles">
+                        <div class="nav-icon"><i class="fas fa-car-side"></i></div> {{ t('ui_nav_vehicles') }}
+                    </div>
+                    <div class="ap-nav-section">{{ t('ui_nav_moderation') }}</div>
+                    <div class="ap-nav-item" :class="{active: tab === 'ban'}" @click="tab = 'ban'" v-if="sections.bans">
+                        <div class="nav-icon"><i class="fas fa-ban"></i></div> {{ t('ui_nav_bans') }}
+                    </div>
+                    <div class="ap-nav-item" :class="{active: tab === 'spectate'}" @click="tab = 'spectate'" v-if="sections.spectate">
+                        <div class="nav-icon"><i class="fas fa-eye"></i></div> {{ t('ui_nav_spectate') }}
+                    </div>
+                    <div class="ap-nav-section">{{ t('ui_nav_system') }}</div>
+                    <div class="ap-nav-item" :class="{active: tab === 'logs'}" @click="tab = 'logs'" v-if="sections.logs">
+                        <div class="nav-icon"><i class="fas fa-file-alt"></i></div> {{ t('ui_nav_logs') }}
+                    </div>
+                    <div class="ap-nav-item" :class="{active: tab === 'admins'}" @click="tab = 'admins'" v-if="sections.admins">
+                        <div class="nav-icon"><i class="fas fa-shield-alt"></i></div> {{ t('ui_nav_admins') }}
+                    </div>
+                    <div class="ap-nav-item" :class="{active: tab === 'staffchat'}" @click="tab = 'staffchat'" v-if="sections.staffchat">
+                        <div class="nav-icon"><i class="fas fa-comments"></i></div> {{ t('ui_nav_staff_chat') }}
+                    </div>
+                    <div class="ap-nav-section" v-if="sections.client_executor || sections.manage_resources">{{ t('ui_nav_developer') }}</div>
+                    <div class="ap-nav-item" :class="{active: tab === 'client_executor'}" @click="tab = 'client_executor'" v-if="sections.client_executor">
+                        <div class="nav-icon"><i class="fas fa-terminal"></i></div> {{ t('ui_nav_executor') }}
+                    </div>
+                    <div class="ap-nav-item" :class="{active: tab === 'manage_resources'}" @click="tab = 'manage_resources'" v-if="sections.manage_resources">
+                        <div class="nav-icon"><i class="fas fa-cubes"></i></div> {{ t('ui_nav_resources') }}
+                    </div>
+                    <div style="flex:1;"></div>
+                </div>
+                <div class="ap-sidebar-footer">
+                    <div class="admin-info">
+                        <div class="admin-avatar" style="border-radius: 4px; overflow: hidden;">
+                            <img v-if="myAvatar" :src="myAvatar" style="width:100%;height:100%;object-fit:cover;" />
+                            <span v-else>{{ myName ? myName.charAt(0).toUpperCase() : 'A' }}</span>
+                        </div>
+                        <div>
+                            <div class="admin-name">{{ myName || 'Admin' }}</div>
+                            <div class="admin-role">{{ myGroup || 'admin' }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="ap-content">
+                <template v-if="tab === 'home'">
+                    <div class="ap-content-header">
+                        <div><h2>{{ t('ui_dashboard') }}</h2><p>{{ t('ui_server_analytics') }}</p></div>
+                        <div class="header-actions">
+                            <button class="btn-action btn-ghost" @click="refreshAnalytics" title="Refresh Analytics">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            <span class="badge badge-green"><i class="fas fa-circle" style="font-size:6px;margin-right:4px;"></i> {{ t('ui_online') }}</span>
+                            <span style="font-size:11px;color:var(--text-muted);">{{ currentTime }}</span>
+                        </div>
+                    </div>
+                    <div class="ap-content-body" style="overflow-y:hidden; display:flex; flex-direction:column; gap:20px; padding-bottom:10px;">
+                        <div class="dash-stats-row" style="flex:0 0 auto;">
+                            <div class="dash-stat-pill green">
+                                <i class="fas fa-users"></i>
+                                <div class="dash-stat-pill-info"><span class="dash-stat-pill-val">{{ onlineCount }}</span><span class="dash-stat-pill-label">{{ t('ui_online') }}</span></div>
+                            </div>
+                            <div class="dash-stat-pill red">
+                                <i class="fas fa-ban"></i>
+                                <div class="dash-stat-pill-info"><span class="dash-stat-pill-val">{{ analytics.activeBans }}</span><span class="dash-stat-pill-label">{{ t('ui_active_bans') }}</span></div>
+                            </div>
+                            <div class="dash-stat-pill purple">
+                                <i class="fas fa-user-slash"></i>
+                                <div class="dash-stat-pill-info"><span class="dash-stat-pill-val">{{ analytics.totalKicks }}</span><span class="dash-stat-pill-label">{{ t('ui_kicks') }}</span></div>
+                            </div>
+                            <div class="dash-stat-pill cyan">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <div class="dash-stat-pill-info"><span class="dash-stat-pill-val">{{ analytics.totalWarnings }}</span><span class="dash-stat-pill-label">{{ t('ui_warnings') }}</span></div>
+                            </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; flex:1; min-height:0;">
+                            <div class="dash-col" style="display:flex; flex-direction:column; gap:20px; overflow:hidden;">
+                                <div class="dash-card" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                                    <div class="dash-card-header" style="flex:0 0 auto;">
+                                        <h3><i class="fas fa-coins" style="color:#F59E0B;margin-right:6px;"></i>{{ t('ui_richest') }}</h3>
+                                    </div>
+                                    <div class="lb-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column;">
+                                        <div v-for="(p, i) in analytics.topPlayers.richest" :key="'rich'+i" class="lb-row" style="cursor:pointer; flex: 0 0 auto;" :style="i < 5 ? {flex: '1 0 auto', minHeight: '36px'} : {}" @click="goToPlayerProfile(p.serverId, p.identifier)">
+                                            <div class="lb-rank" :class="{'gold': i === 0, 'silver': i === 1, 'bronze': i === 2}">{{ i + 1 }}</div>
+                                            <div class="lb-info">
+                                                <div class="lb-name">{{ p.name }} <span v-if="p.serverId" style="font-size:10px;color:#10B981;margin-left:4px;"><i class="fas fa-circle"></i></span></div>
+                                                <div class="lb-meta" style="color:#10B981;font-weight:bold;">{{ p.value }}</div>
+                                            </div>
+                                        </div>
+                                         <p v-if="!analytics.topPlayers.richest || analytics.topPlayers.richest.length === 0" class="empty-state">{{ t('ui_no_data') }}</p>
+                                    </div>
+                                </div>
+                                <div class="dash-card" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                                    <div class="dash-card-header" style="flex:0 0 auto;">
+                                        <h3><i class="fas fa-user-plus" style="color:#3B82F6;margin-right:6px;"></i>{{ t('ui_new_arrivals') }}</h3>
+                                    </div>
+                                    <div class="lb-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column;">
+                                         <div v-for="(p, i) in analytics.topPlayers.newest" :key="'new'+i" class="lb-row" style="cursor:pointer; flex: 0 0 auto;" :style="i < 5 ? {flex: '1 0 auto', minHeight: '36px'} : {}" @click="goToPlayerProfile(p.serverId, p.identifier)">
+                                            <div class="lb-rank" style="background:rgba(59,130,246,0.1);color:#3B82F6;font-size:10px;"><i class="fas fa-user"></i></div>
+                                            <div class="lb-info">
+                                                <div class="lb-name">{{ p.name }} <span v-if="p.serverId" style="font-size:10px;color:#10B981;margin-left:4px;"><i class="fas fa-circle"></i></span></div>
+                                                <div class="lb-meta" style="color:#94A3B8;">{{ t('ui_welcome') }}</div>
+                                            </div>
+                                        </div>
+                                        <p v-if="!analytics.topPlayers.newest || analytics.topPlayers.newest.length === 0" class="empty-state">{{ t('ui_no_data') }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="dash-card" style="display:flex; flex-direction:column; padding:20px; overflow:hidden;">
+                                <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex:0 0 auto;">
+                                    <h3><i class="fas fa-chart-bar" style="color:#10B981;margin-right:6px;"></i>{{ t('ui_job_distribution') }}</h3>
+                                    <span class="badge badge-green">{{ t('ui_all') }}</span>
+                                </div>
+                                <div class="job-list-scroll" style="flex:1; overflow-y:auto; padding-right:5px; display:flex; flex-direction:column; justify-content:flex-start; gap:8px;">
+                                    <div v-for="(job, i) in analytics.jobStats" :key="i" style="display:flex; align-items:center; gap:12px; font-size:13px; min-height:20px;">
+                                        <div style="width:110px; text-transform:uppercase; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:left;" :title="job.name">{{ job.name }}</div>
+                                        <div style="flex:1; background:rgba(255,255,255,0.05); height:12px; border-radius:6px; overflow:hidden;">
+                                            <div :style="{
+                                                width: (job.count / (analytics.jobStats[0] ? analytics.jobStats[0].count : 1) * 100) + '%', 
+                                                height: '100%', 
+                                                background: i < 5 ? ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'][i] : '#6B7280',
+                                                borderRadius: '6px',
+                                                transition: 'width 0.5s ease'
+                                            }"></div>
+                                        </div>
+                                        <div style="width:30px; text-align:right; font-weight:bold; color:white;">{{ job.count }}</div>
+                                    </div>
+                                     <p v-if="!analytics.jobStats || analytics.jobStats.length === 0" class="empty-state" style="margin:auto;">{{ t('ui_no_job_data') }}</p>
+                                </div>
+                            </div>
+                            <div class="dash-col" style="display:flex; flex-direction:column; gap:20px; overflow:hidden;">
+                                <div class="dash-card" style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                                    <div class="dash-card-header" style="flex:0 0 auto;">
+                                        <h3><i class="fas fa-user-shield" style="color:#10B981;margin-right:6px;"></i>{{ t('ui_online_staff') }}</h3>
+                                        <span class="badge badge-green">{{ onlineAdmins.length }} {{ t('ui_active') }}</span>
+                                    </div>
+                                    <div class="lb-list" style="flex:1; overflow-y:auto;">
+                                        <div v-for="admin in onlineAdmins" :key="admin.id" class="lb-row">
+                                            <div class="lb-rank" style="background:rgba(16,185,129,0.1);color:#10B981;">
+                                                <i class="fas fa-circle" style="font-size:6px;"></i>
+                                            </div>
+                                            <div class="lb-info">
+                                                <div class="lb-name">{{ admin.name }}</div>
+                                                <div class="lb-meta">
+                                                    <span>{{ admin.group }}</span>
+                                                    <span v-if="admin.duty" style="color:#10B981;margin-left:4px;">{{ t('ui_on_duty') }}</span>
+                                                    <span v-else style="color:#EF4444;margin-left:4px;">{{ t('ui_off_duty') }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p v-if="!onlineAdmins || onlineAdmins.length === 0" class="empty-state">{{ t('ui_no_staff_online') }}</p>
+                                    </div>
+                                </div>
+                                <div class="dash-card" style="flex:0 0 auto; padding:15px;">
+                                    <h3 style="font-size:14px; margin-bottom:15px;"><i class="fas fa-calendar-week" style="color:#8B5CF6;margin-right:6px;"></i>{{ t('ui_weekly_stats') }}</h3>
+                                    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; text-align:center;">
+                                        <div style="background:rgba(239,68,68,0.1); border-radius:6px; padding:8px;">
+                                            <div style="font-size:18px; color:#EF4444; font-weight:bold;">{{ analytics.weeklyStats.bans }}</div>
+                                            <div style="font-size:10px; color:#F87171; text-transform:uppercase;">{{ t('ui_bans') }}</div>
+                                        </div>
+                                        <div style="background:rgba(245,158,11,0.1); border-radius:6px; padding:8px;">
+                                            <div style="font-size:18px; color:#F59E0B; font-weight:bold;">{{ analytics.weeklyStats.kicks }}</div>
+                                            <div style="font-size:10px; color:#FBBF24; text-transform:uppercase;">{{ t('ui_kicks') }}</div>
+                                        </div>
+                                        <div style="background:rgba(6,182,212,0.1); border-radius:6px; padding:8px;">
+                                            <div style="font-size:18px; color:#06B6D4; font-weight:bold;">{{ analytics.weeklyStats.warns }}</div>
+                                            <div style="font-size:10px; color:#22D3EE; text-transform:uppercase;">{{ t('ui_warns') }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <template v-if="tab === 'players'">
+                    <div class="ap-content-header">
+                        <div>
+                            <h2>{{ selectedPlayerId !== null ? t('ui_player_profile') : t('ui_nav_players') }}</h2>
+                            <p>{{ selectedPlayerId !== null ? t('ui_detailed_info') : onlineCount + ' ' + t('ui_players_online') }}</p>
+                        </div>
+                        <div class="header-actions">
+                            <button v-if="selectedPlayerId !== null" class="btn-action btn-ghost" @click="selectedPlayerId = null; activeActionModal = null">
+                                <i class="fas fa-arrow-left"></i> {{ t('ui_back') }}
+                            </button>
+                            <input v-else class="input-field" type="text" v-model="playerSearchId" :placeholder="t('ui_search_players')" style="width:280px;" />
+                        </div>
+                    </div>
+                    <div class="ap-content-body">
+                        <template v-if="selectedPlayerId === null">
+                            <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+                                <button class="btn-action btn-sm" :class="playerSort === 'name' ? 'btn-primary' : 'btn-ghost'" @click="playerSort = 'name'"><i class="fas fa-sort-alpha-down"></i> {{ t('ui_sort_name') }}</button>
+                                <button class="btn-action btn-sm" :class="playerSort === 'money' ? 'btn-primary' : 'btn-ghost'" @click="playerSort = 'money'"><i class="fas fa-money-bill-wave"></i> {{ t('ui_sort_money') }}</button>
+                                <button class="btn-action btn-sm" :class="playerSort === 'group' ? 'btn-primary' : 'btn-ghost'" @click="playerSort = 'group'"><i class="fas fa-users-cog"></i> {{ t('ui_sort_group') }}</button>
+                                <button class="btn-action btn-sm" :class="playerSort === 'steam' ? 'btn-primary' : 'btn-ghost'" @click="playerSort = 'steam'"><i class="fas fa-steam"></i> Steam</button>
+                                <button class="btn-action btn-sm" :class="playerSort === 'id' ? 'btn-primary' : 'btn-ghost'" @click="playerSort = 'id'"><i class="fas fa-hashtag"></i> ID</button>
+                            </div>
+                            <div class="player-list">
+                                <div v-for="p in filteredPlayers" :key="p.id" class="player-list-item" @click="selectPlayer(p.id)">
+                                    <div class="flex items-center gap-3">
+                                        <div class="player-avatar">
+                                            <img v-if="p.avatar" :src="p.avatar" />
+                                            <span v-else>{{ p.id }}</span>
+                                        </div>
+                                        <div>
+                                            <div class="player-name">{{ p.playerName || p.name }}</div>
+                                    <div class="player-meta">ID: {{ p.id }} | {{ p.job }}</div>
+                                    <div class="status-bars" style="margin-top:4px;display:flex;flex-direction:column;gap:2px;width:100px;">
+                                        <div class="bar-bg" style="background:rgba(255,255,255,0.1);height:3px;border-radius:2px;overflow:hidden;">
+                                            <div class="bar-fill health" :style="{width: Math.max(0, p.health - 100) + '%', background:'#10B981', height:'100%'}"></div>
+                                        </div>
+                                        <div v-if="p.armor > 0" class="bar-bg" style="background:rgba(255,255,255,0.1);height:3px;border-radius:2px;overflow:hidden;">
+                                            <div class="bar-fill armor" :style="{width: p.armor + '%', background:'#3B82F6', height:'100%'}"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                                    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                                        <span class="badge badge-blue" style="font-size:9px;" v-if="p.group">{{ p.group }}</span>
+                                    </div>
+                                </div>
+                                <p v-if="filteredPlayers.length === 0" class="empty-state">{{ t('ui_no_players_found') }}</p>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <div v-if="selectedPlayer" class="pp-layout">
+                                <div class="pp-grid">
+                                    <div class="pp-left">
+                                        <div class="pp-avatar-card">
+                                            <div class="pp-avatar-wrap">
+                                                <div class="player-profile-avatar pp-avatar-lg">
+                                                    <img v-if="selectedPlayer.avatar" :src="selectedPlayer.avatar" />
+                                                    <span v-else>{{ selectedPlayer.name ? selectedPlayer.name.charAt(0).toUpperCase() : '?' }}</span>
+                                                </div>
+                                                <div class="pp-avatar-info">
+                                                    <div class="pp-avatar-name">{{ selectedPlayer.playerName || selectedPlayer.name }}</div>
+                                                    <div class="pp-avatar-meta">
+                                                        <span class="pp-avatar-id">ID: {{ selectedPlayer.id }}</span>
+                                                        <span class="badge badge-green" style="font-size:8px;padding:2px 6px;">Online</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="pp-bars-inline">
+                                                <div class="pp-bar-row">
+                                                    <span class="pp-bar-label"><i class="fas fa-heart" style="color:#10B981;"></i></span>
+                                                    <div class="pp-bar-track"><div class="pp-bar-fill health" :style="{width: Math.max(0, (selectedPlayer.health || 200) - 100) + '%'}"></div></div>
+                                                    <span class="pp-bar-value">{{ Math.max(0, (selectedPlayer.health || 200) - 100) }}</span>
+                                                </div>
+                                                <div class="pp-bar-row">
+                                                    <span class="pp-bar-label"><i class="fas fa-shield-alt" style="color:#3B82F6;"></i></span>
+                                                    <div class="pp-bar-track"><div class="pp-bar-fill armor" :style="{width: (selectedPlayer.armor || 0) + '%'}"></div></div>
+                                                    <span class="pp-bar-value">{{ selectedPlayer.armor || 0 }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="pp-info-card">
+                                            <div class="pp-info-title">{{ t('ui_identity') }}</div>
+                                            <div class="pp-stat-row"><span class="label">{{ t('ui_character_name') }}</span><span class="value">{{ selectedPlayer.name || 'N/A' }}</span></div>
+                                            <div class="pp-stat-row"><span class="label">{{ t('ui_steam_name') }}</span><span class="value">{{ selectedPlayer.playerName || 'N/A' }}</span></div>
+                                            <div class="pp-stat-row" v-if="selectedPlayer.playerInfoFields && selectedPlayer.playerInfoFields.uuid"><span class="label">{{ t('ui_uuid') }}</span><span class="value mono" style="font-size:11px;">{{ selectedPlayer.uuid || 'N/A' }}</span></div>
+                                            <div class="pp-stat-row"><span class="label">{{ t('ui_job') }}</span><span class="value">{{ selectedPlayer.jobLabel || selectedPlayer.job || 'Unemployed' }}</span></div>
+                                            <div class="pp-stat-row"><span class="label">{{ t('ui_grade') }}</span><span class="value">{{ selectedPlayer.jobGradeLabel || selectedPlayer.jobGrade || 0 }}</span></div>
+                                            <div class="pp-stat-row" v-if="selectedPlayer.playerInfoFields && selectedPlayer.playerInfoFields.job2 && selectedPlayer.job2"><span class="label">{{ t('ui_job2') }}</span><span class="value">{{ selectedPlayer.job2Label || selectedPlayer.job2 }} ({{ selectedPlayer.job2GradeLabel || selectedPlayer.job2Grade || 0 }})</span></div>
+                                            <div class="pp-stat-row" v-if="selectedPlayer.playerInfoFields && selectedPlayer.playerInfoFields.metadata_job && selectedPlayer.metadataJob"><span class="label">{{ t('ui_metadata_job') }}</span><span class="value">{{ selectedPlayer.metadataJobLabel || selectedPlayer.metadataJob }} ({{ selectedPlayer.metadataJobGradeLabel || selectedPlayer.metadataJobGrade || 0 }})</span></div>
+                                            <div class="pp-stat-row"><span class="label">{{ t('ui_group') }}</span><span class="value">{{ selectedPlayer.group || 'user' }}</span></div>
+                                        </div>
+                                        <div class="pp-info-card">
+                                            <div class="pp-info-title">Position <i class="fas fa-copy pp-copy-icon" @click="selectedPlayer.coords && copyToClipboard(selectedPlayer.coords.x.toFixed(2) + ', ' + selectedPlayer.coords.y.toFixed(2) + ', ' + selectedPlayer.coords.z.toFixed(2))" title="Copy Coords"></i></div>
+                                            <div class="pp-stat-row"><span class="label">X</span><span class="value mono">{{ selectedPlayer.coords ? selectedPlayer.coords.x.toFixed(2) : 'N/A' }}</span></div>
+                                            <div class="pp-stat-row"><span class="label">Y</span><span class="value mono">{{ selectedPlayer.coords ? selectedPlayer.coords.y.toFixed(2) : 'N/A' }}</span></div>
+                                            <div class="pp-stat-row"><span class="label">Z</span><span class="value mono">{{ selectedPlayer.coords ? selectedPlayer.coords.z.toFixed(2) : 'N/A' }}</span></div>
+                                            <div class="pp-stat-row" v-if="selectedPlayer.streetName"><span class="label">Street</span><span class="value">{{ selectedPlayer.streetName }}</span></div>
+                                            <div class="pp-stat-row" v-if="selectedPlayer.zone"><span class="label">Zone</span><span class="value">{{ selectedPlayer.zone }}</span></div>
+                                            <div class="pp-stat-row" v-if="selectedPlayer.interior != null"><span class="label">Interior</span><span class="value mono">{{ selectedPlayer.interior }}</span></div>
+                                            <div class="pp-stat-row" v-if="selectedPlayer.dimension != null"><span class="label">Dimension</span><span class="value mono">{{ selectedPlayer.dimension }}</span></div>
+                                        </div>
+                                        <div class="pp-info-card">
+                                            <div class="pp-info-title">{{ t('ui_financial') }}</div>
+                                            <div class="pp-stat-row" v-if="!selectedPlayer.playerInfoFields || selectedPlayer.playerInfoFields.cash"><span class="label">{{ t('ui_cash') }}</span><span class="value green">&#36;{{ formatNumber(selectedPlayer.money || 0) }}</span></div>
+                                            <div class="pp-stat-row" v-if="!selectedPlayer.playerInfoFields || selectedPlayer.playerInfoFields.bank"><span class="label">{{ t('ui_bank') }}</span><span class="value blue">&#36;{{ formatNumber(selectedPlayer.bank || 0) }}</span></div>
+                                            <div class="pp-stat-row" v-if="!selectedPlayer.playerInfoFields || selectedPlayer.playerInfoFields.black_money"><span class="label">{{ t('ui_black_money') }}</span><span class="value red">&#36;{{ formatNumber(selectedPlayer.blackMoney || 0) }}</span></div>
+                                        </div>
+                                        <div class="pp-info-card">
+                                            <div class="pp-info-title">{{ t('ui_player_details') }}</div>
+                                            <div class="pp-stat-row" v-if="!selectedPlayer.playerInfoFields || selectedPlayer.playerInfoFields.ping"><span class="label">{{ t('ui_ping') }}</span><span class="value">{{ selectedPlayer.ping || 'N/A' }} ms</span></div>
+                                            <div class="pp-stat-row" v-if="!selectedPlayer.playerInfoFields || selectedPlayer.playerInfoFields.phone"><span class="label">{{ t('ui_phone') }}</span><span class="value">{{ selectedPlayer.phoneNumber || 'N/A' }}</span></div>
+                                            <div class="pp-stat-row" v-if="!selectedPlayer.playerInfoFields || selectedPlayer.playerInfoFields.vehiclesOwned"><span class="label">{{ t('ui_vehicles_owned') }}</span><span class="value">{{ selectedPlayer.vehiclesCount || 0 }}</span></div>
+                                            <div class="pp-stat-row"><span class="label">{{ t('ui_inventory') }}</span><span class="value">{{ selectedPlayerInventory ? selectedPlayerInventory.length : 0 }} {{ t('ui_items') }}</span></div>
+                                            <div class="pp-stat-row" v-if="!selectedPlayer.playerInfoFields || selectedPlayer.playerInfoFields.inVehicle"><span class="label">{{ t('ui_in_vehicle') }}</span><span class="value" :class="selectedPlayer.inVehicle ? 'green' : 'warn'">{{ selectedPlayer.inVehicle ? t('ui_yes') : t('ui_no') }}</span></div>
+                                        </div>
+                                    </div>
+                                    <div class="pp-center">
+                                        <div class="pp-action-section">
+                                            <div class="pp-section-title"><i class="fas fa-gamepad"></i> {{ t('ui_player_control') }}</div>
+                                            <div class="pp-big-grid">
+                                                <div class="pp-big-tile blue" :class="{ disabled: !myPermissions.goto_player }" @click="myPermissions.goto_player && playerAction('goto')" title="Teleport to player">
+                                                    <i class="fas fa-location-arrow"></i><span>{{ t('ui_goto') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile blue" :class="{ disabled: !myPermissions.bring }" @click="myPermissions.bring && playerAction('bring')" title="Bring player to you">
+                                                    <i class="fas fa-hand-point-right"></i><span>{{ t('ui_bring') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile cyan" :class="{ disabled: !myPermissions.spectate }" @click="myPermissions.spectate && playerAction('spectate')" title="Spectate player">
+                                                    <i class="fas fa-eye"></i><span>{{ t('ui_spectate') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile blue" :class="{ disabled: !myPermissions.send_dm }" @click="myPermissions.send_dm && (activeActionModal = 'dm')" title="Send direct message">
+                                                    <i class="fas fa-envelope"></i><span>{{ t('ui_send_dm') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile cyan" :class="{ disabled: !myPermissions.spectate }" @click="myPermissions.spectate && takeScreenshot()" title="Take player screenshot">
+                                                    <i class="fas fa-camera"></i><span>{{ t('ui_screenshot') }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="pp-action-section">
+                                            <div class="pp-section-title"><i class="fas fa-heartbeat"></i> {{ t('ui_player_state') }}</div>
+                                            <div class="pp-big-grid">
+                                                <div class="pp-big-tile green" :class="{ disabled: !myPermissions.heal }" @click="myPermissions.heal && playerAction('heal')" title="Heal player to full HP">
+                                                    <i class="fas fa-heart"></i><span>{{ t('ui_heal') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile cyan" :class="{ disabled: !myPermissions.revive }" @click="myPermissions.revive && playerAction('revive')" title="Revive downed player">
+                                                    <i class="fas fa-heartbeat"></i><span>{{ t('ui_revive') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile red" :class="{ disabled: !myPermissions.kill }" @click="myPermissions.kill && playerAction('kill')" title="Kill player">
+                                                    <i class="fas fa-skull"></i><span>{{ t('ui_kill') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile cyan" :class="{ disabled: !myPermissions.freeze }" @click="myPermissions.freeze && playerAction('freeze')" title="Freeze player position">
+                                                    <i class="fas fa-snowflake"></i><span>{{ t('ui_freeze') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile orange" :class="{ disabled: !myPermissions.freeze }" @click="myPermissions.freeze && playerAction('unfreeze')" title="Unfreeze player">
+                                                    <i class="fas fa-fire"></i><span>{{ t('ui_unfreeze') }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="pp-action-section">
+                                            <div class="pp-section-title"><i class="fas fa-cog"></i> {{ t('ui_management') }}</div>
+                                            <div class="pp-big-grid">
+                                                <div class="pp-big-tile purple" :class="{ disabled: !myPermissions.set_job }" @click="myPermissions.set_job && (activeActionModal = 'setjob')" title="Set player job">
+                                                    <i class="fas fa-briefcase"></i><span>{{ t('ui_set_job') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile purple" :class="{ disabled: !myPermissions.set_group }" @click="myPermissions.set_group && (activeActionModal = 'setgroup')" title="Set player group">
+                                                    <i class="fas fa-user-shield"></i><span>{{ t('ui_set_group') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile purple" :class="{ disabled: !myPermissions.set_money }" @click="myPermissions.set_money && (activeActionModal = 'setmoney')" title="Set player money">
+                                                    <i class="fas fa-dollar-sign"></i><span>{{ t('ui_set_money') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile purple" :class="{ disabled: !myPermissions.give_item }" @click="myPermissions.give_item && (activeActionModal = 'giveitem')" title="Give item to player">
+                                                    <i class="fas fa-plus-circle"></i><span>{{ t('ui_give_item') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile purple" :class="{ disabled: !myPermissions.remove_money }" @click="myPermissions.remove_money && (activeActionModal = 'removemoney')" title="Remove player money">
+                                                    <i class="fas fa-minus-circle"></i><span>{{ t('ui_remove_money') }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="pp-action-section danger">
+                                            <div class="pp-section-title"><i class="fas fa-shield-alt"></i> {{ t('ui_moderation') }}</div>
+                                            <div class="pp-big-grid danger-grid">
+                                                <div class="pp-big-tile danger-tile" :class="{ disabled: !myPermissions.kick }" @click="myPermissions.kick && openKickModal(selectedPlayer)" title="Kick player from server">
+                                                    <i class="fas fa-user-slash"></i><span>{{ t('ui_kick') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile danger-tile" :class="{ disabled: !myPermissions.warn }" @click="myPermissions.warn && openWarnPrompt()" title="Issue warning to player">
+                                                    <i class="fas fa-exclamation-triangle"></i><span>{{ t('ui_warn') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile danger-tile ban" :class="{ disabled: !myPermissions.ban }" @click="myPermissions.ban && openBanModal(selectedPlayer)" title="Ban player from server">
+                                                    <i class="fas fa-ban"></i><span>{{ t('ui_ban') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile danger-tile" :class="{ disabled: !myPermissions.clear_inventory }" @click="myPermissions.clear_inventory && playerAction('clearinventory')" title="Clear player inventory">
+                                                    <i class="fas fa-eraser"></i><span>{{ t('ui_clear_inv') }}</span>
+                                                </div>
+                                                <div class="pp-big-tile danger-tile" :class="{ disabled: !myPermissions.clear_inventory }" @click="myPermissions.clear_inventory && playerAction('clearweapons')" title="Clear player weapons">
+                                                    <i class="fas fa-gun"></i><span>{{ t('ui_clear_weapons') }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="pp-action-section">
+                                            <div class="pp-section-title"><i class="fas fa-ban"></i> {{ t('ui_ban_history') }}</div>
+                                            <div class="pp-info-card pp-ban-list" style="margin-top: 4px; border: 1px solid rgba(255,255,255,0.05); background: transparent; min-height: 80px; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
+                                                <template v-if="selectedPlayerBans && selectedPlayerBans.length > 0">
+                                                    <div v-for="(ban, i) in selectedPlayerBans" :key="i" class="pp-stat-row" style="flex-direction: column; align-items: flex-start; gap: 2px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                                        <div style="display:flex; justify-content: space-between; width: 100%;">
+                                                            <span class="label" style="max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" :title="ban.reason">{{ ban.reason }}</span>
+                                                            <span class="value" :class="ban.active ? 'red' : 'green'" style="font-size: 10px;">{{ ban.active ? t('ui_ban_active') : t('ui_ban_expired') }}</span>
+                                                        </div>
+                                                        <span style="font-size: 9px; color: rgba(255,255,255,0.4);">By: {{ ban.admin }}</span>
+                                                    </div>
+                                                </template>
+                                                <template v-else>
+                                                    <div style="display:flex; flex-direction:column; justify-content:center; align-items:center; height: 100%; min-height: 60px; color: rgba(255,255,255,0.3); font-size: 11px; gap: 6px;">
+                                                        <i class="fas fa-user-slash" style="font-size: 20px;"></i>
+                                                        <span style="font-size: 13px; font-weight: bold;">{{ t('ui_no_bans_record') }}</span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="pp-right">
+                                        <div class="pp-tab-header">
+                                            <div class="pp-tab-btn" :class="{active: profileTab === 'inventory'}" @click="profileTab = 'inventory'"><i class="fas fa-box"></i> {{ t('ui_inventory') }}</div>
+                                            <div class="pp-tab-btn" :class="{active: profileTab === 'identifiers'}" @click="profileTab = 'identifiers'"><i class="fas fa-fingerprint"></i> {{ t('ui_ids') }}</div>
+                                            <div class="pp-tab-btn" :class="{active: profileTab === 'warnings'}" @click="profileTab = 'warnings'"><i class="fas fa-exclamation-circle"></i> {{ t('ui_warns') }} <span v-if="selectedPlayerWarnings.length > 0" class="pp-tab-count">{{ selectedPlayerWarnings.length }}</span></div>
+                                        </div>
+                                        <div class="pp-tab-content" v-if="profileTab === 'inventory'">
+                                            <div class="pp-inv-toolbar" style="display:flex; gap:6px; align-items:center;">
+                                                <input class="input-field pp-tab-search" type="text" v-model="inventorySearch" :placeholder="t('ui_search_items')" style="flex:1;" />
+                                                <select class="input-field" v-model="inventorySort" style="width:auto; min-width:80px;">
+                                                    <option value="none">Sort ▾</option>
+                                                    <option value="label_asc">A → Z</option>
+                                                    <option value="label_desc">Z → A</option>
+                                                    <option value="count_desc">Qty ↓</option>
+                                                    <option value="count_asc">Qty ↑</option>
+                                                </select>
+                                            </div>
+                                            <div v-if="filteredInventory.length > 0" class="inventory-grid" style="margin-top:6px;">
+                                                <div class="inv-item" v-for="(item, i) in filteredInventory" :key="'inv-' + i + '-' + (item.name || '')" style="position:relative;">
+                                                    <div v-if="myPermissions.remove_item" @click.stop="removeItemPrompt(item)" class="inv-remove-btn"><i class="fas fa-times"></i></div>
+                                                    <img v-if="item.image" :src="item.image" />
+                                                    <div v-else class="inv-placeholder"><i class="fas fa-question"></i></div>
+                                                    <span class="inv-name">{{ item.label || item.name }}</span>
+                                                    <span class="inv-count">x{{ item.count }}</span>
+                                                </div>
+                                            </div>
+                                            <p v-else class="empty-state" style="padding:16px 0;font-size:11px;">{{ t('ui_no_items_found') }}</p>
+                                        </div>
+                                        <div class="pp-tab-content" v-if="profileTab === 'identifiers'">
+                                            <div class="pp-ids-header">
+                                                <span class="pp-info-title" style="margin-bottom:0;">{{ t('ui_identifiers') }}</span>
+                                                <i class="fas fa-copy pp-copy-icon" @click="copyAllIdentifiers" title="Copy All"></i>
+                                            </div>
+                                            <div class="pp-id-row" v-for="(val, key) in (selectedPlayer.identifiers || {})" :key="key">
+                                                <span class="pp-id-label">{{ key }}</span>
+                                                <div class="pp-id-value-wrap">
+                                                    <span class="value mono" :class="{'blur-text': val.startsWith && val.startsWith('ip:') && !showIp}" @mouseenter="val.startsWith && val.startsWith('ip:') ? showIp = true : null" @mouseleave="val.startsWith && val.startsWith('ip:') ? showIp = false : null" :title="val.startsWith && val.startsWith('ip:') ? 'Hover to reveal' : ''">
+                                                        {{ val }}
+                                                    </span>
+                                                    <i class="fas fa-copy pp-copy-icon" @click.stop="copyToClipboard(val)" title="Copy"></i>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="pp-tab-content" v-if="profileTab === 'warnings'">
+                                            <div v-if="selectedPlayerWarnings.length > 0" class="pp-warnings-list">
+                                                <div v-for="w in selectedPlayerWarnings" :key="w.id" class="pp-warning-item">
+                                                    <div class="pp-warning-icon"><i class="fas fa-exclamation-circle"></i></div>
+                                                    <div class="pp-warning-body">
+                                                        <div class="pp-warning-reason">{{ w.reason }}</div>
+                                                        <div class="pp-warning-meta">{{ w.admin_name }} · {{ formatTimestamp(w.timestamp) }}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p v-else class="empty-state" style="padding:16px 0;font-size:11px;">{{ t('ui_no_warnings_record') }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p v-else class="empty-state">{{ t('ui_loading_player') }}</p>
+                        </template>
+                    </div>
+                </template>
+                <template v-if="tab === 'offline_players'">
+                    <div class="ap-content-header">
+                        <div>
+                            <h2>{{ selectedOfflineId ? t('ui_offline_player_profile') : t('ui_offline_players') }}</h2>
+                            <p>{{ selectedOfflineId ? t('ui_database_info') : filteredOfflinePlayers.length + ' ' + t('ui_offline_players_count') }}</p>
+                        </div>
+                        <div class="header-actions">
+                            <button v-if="selectedOfflineId" class="btn-action btn-ghost" @click="selectedOfflineId = null; offlineActionModal = null; $store.commit('setSelectedOfflinePlayer', null)">
+                                <i class="fas fa-arrow-left"></i> {{ t('ui_back') }}
+                            </button>
+                            <template v-else>
+                                <input class="input-field" type="text" v-model="offlineSearch" :placeholder="t('ui_search_offline')" style="width:220px;" />
+                            </template>
+                        </div>
+                    </div>
+                    <div class="ap-content-body">
+                        <template v-if="!selectedOfflineId">
+                            <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+                                <button class="btn-action btn-sm" :class="offlineSort === 'name' ? 'btn-primary' : 'btn-ghost'" @click="offlineSort = 'name'"><i class="fas fa-sort-alpha-down"></i> A-Z</button>
+                                <button class="btn-action btn-sm" :class="offlineSort === 'cash' ? 'btn-primary' : 'btn-ghost'" @click="offlineSort = 'cash'"><i class="fas fa-money-bill-wave"></i> Cash</button>
+                                <button class="btn-action btn-sm" :class="offlineSort === 'bank' ? 'btn-primary' : 'btn-ghost'" @click="offlineSort = 'bank'"><i class="fas fa-university"></i> Bank</button>
+                                <button class="btn-action btn-sm" :class="offlineSort === 'job' ? 'btn-primary' : 'btn-ghost'" @click="offlineSort = 'job'"><i class="fas fa-briefcase"></i> Job</button>
+                            </div>
+                            <div class="player-list">
+                                <div v-for="p in filteredOfflinePlayers" :key="p.identifier" class="player-list-item" @click="selectOfflinePlayer(p.identifier)">
+                                    <div class="flex items-center gap-3">
+                                        <div class="player-avatar"><span style="font-size:11px;"><i class="fas fa-user-clock"></i></span></div>
+                                        <div>
+                                            <div class="player-name">{{ p.name }}</div>
+                                            <div class="player-meta">{{ p.job }} | {{ p.group }}</div>
+                                        </div>
+                                    </div>
+                                    <div style="display:flex; gap:12px; align-items:center;">
+                                        <span style="font-size:11px; color:#10B981;">&#36;{{ formatNumber(p.money || 0) }}</span>
+                                        <span class="badge badge-blue" style="font-size:9px;">{{ p.group }}</span>
+                                    </div>
+                                </div>
+                                <p v-if="filteredOfflinePlayers.length === 0" class="empty-state">{{ t('ui_no_offline_found') }}</p>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <div v-if="selectedOfflinePlayer" class="pp-layout" style="display:flex; flex-direction:column; gap:10px; height:100%;">
+                                <div class="pp-card pp-header-compact" style="flex:0 0 auto; padding:14px 16px;">
+                                    <div class="pp-avatar-wrap-compact">
+                                        <div class="pp-avatar-circle-compact"><i class="fas fa-user-clock"></i></div>
+                                        <div class="pp-header-info">
+                                            <h2 class="pp-player-name" style="margin-bottom:2px;">{{ selectedOfflinePlayer.name }}</h2>
+                                            <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+                                                <span class="badge badge-red">{{ t('ui_database_record') }}</span>
+                                                <span style="font-size:11px; opacity:0.5; font-weight:600;">{{ selectedOfflinePlayer.identifier }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr 1.4fr; gap:10px; flex:1; min-height:0; align-items:stretch;">
+                                    <div style="display:flex; flex-direction:column; gap:10px; min-height:0; overflow-y:auto;">
+                                        <div class="pp-card" style="display:flex; flex-direction:column; gap:6px;">
+                                            <div class="pp-section-title"><i class="fas fa-user-tag"></i> {{ t('ui_personal_profile') }}</div>
+                                            <div class="pp-info-list" style="display:flex; flex-direction:column; justify-content:space-evenly; flex:1; gap:6px;">
+                                                <div class="pp-info-item"><span style="font-size:13px; font-weight:500; color:var(--text-secondary);">{{ t('ui_full_name') }}</span><strong style="font-size:14px;">{{ selectedOfflinePlayer.firstname }} {{ selectedOfflinePlayer.lastname }}</strong></div>
+                                                <div class="pp-info-item"><span style="font-size:13px; font-weight:500; color:var(--text-secondary);">{{ t('ui_dob') }}</span><strong style="font-size:14px;">{{ selectedOfflinePlayer.dateofbirth || 'N/A' }}</strong></div>
+                                                <div class="pp-info-item"><span style="font-size:13px; font-weight:500; color:var(--text-secondary);">{{ t('ui_sex') }}</span><strong style="font-size:14px;">{{ formatSex(selectedOfflinePlayer.sex) }}</strong></div>
+                                                <div class="pp-info-item" v-if="!selectedOfflinePlayer.playerInfoFields || selectedOfflinePlayer.playerInfoFields.phone"><span style="font-size:13px; font-weight:500; color:var(--text-secondary);">{{ t('ui_phone') }}</span><strong style="font-size:14px;">{{ selectedOfflinePlayer.phoneNumber || 'N/A' }}</strong></div>
+                                                <div class="pp-info-item"><span style="font-size:13px; font-weight:500; color:var(--text-secondary);">{{ t('ui_group') }}</span><strong style="font-size:14px;">{{ selectedOfflinePlayer.group || 'user' }}</strong></div>
+                                                <div class="pp-info-item" v-if="selectedOfflinePlayer.playerInfoFields && selectedOfflinePlayer.playerInfoFields.uuid"><span style="font-size:13px; font-weight:500; color:var(--text-secondary);">{{ t('ui_uuid') }}</span><strong style="font-size:12px; word-break:break-all;" class="mono">{{ selectedOfflinePlayer.identifier || 'N/A' }}</strong></div>
+                                            </div>
+                                        </div>
+                                        <div class="pp-card" style="display:flex; flex-direction:column; gap:6px;">
+                                            <div class="pp-section-title"><i class="fas fa-wallet"></i> {{ t('ui_economy') }}</div>
+                                            <div class="pp-info-list" style="display:flex; flex-direction:column; gap:6px;">
+                                                <div class="pp-info-item" v-if="!selectedOfflinePlayer.playerInfoFields || selectedOfflinePlayer.playerInfoFields.cash"><span style="font-size:12px;">{{ t('ui_cash') }}</span><strong style="font-size:14px; color:#6EE7B7;">&#36;{{ formatNumber(selectedOfflinePlayer.money || 0) }}</strong></div>
+                                                <div class="pp-info-item" v-if="!selectedOfflinePlayer.playerInfoFields || selectedOfflinePlayer.playerInfoFields.bank"><span style="font-size:12px;">{{ t('ui_bank') }}</span><strong style="font-size:14px; color:#93C5FD;">&#36;{{ formatNumber(selectedOfflinePlayer.bank || 0) }}</strong></div>
+                                                <div class="pp-info-item" v-if="!selectedOfflinePlayer.playerInfoFields || selectedOfflinePlayer.playerInfoFields.black_money"><span style="font-size:12px;">{{ t('ui_black_money') }}</span><strong style="font-size:14px; color:#FCA5A5;">&#36;{{ formatNumber(selectedOfflinePlayer.blackMoney || 0) }}</strong></div>
+                                            </div>
+                                            <div class="pp-info-item" style="border-top:1px solid rgba(255,255,255,0.05); padding-top:6px; margin-top:2px;">
+                                                <span style="font-size:12px;">{{ t('ui_job') }}</span>
+                                                <strong style="font-size:13px;">{{ selectedOfflinePlayer.jobLabel || selectedOfflinePlayer.job }} ({{ selectedOfflinePlayer.gradeLabel || selectedOfflinePlayer.jobGrade || 0 }})</strong>
+                                            </div>
+                                            <div v-if="selectedOfflinePlayer.playerInfoFields && selectedOfflinePlayer.playerInfoFields.job2 && selectedOfflinePlayer.job2" class="pp-info-item">
+                                                <span style="font-size:12px;">{{ t('ui_job2') }}</span>
+                                                <strong style="font-size:13px;">{{ selectedOfflinePlayer.job2Label || selectedOfflinePlayer.job2 }} ({{ selectedOfflinePlayer.job2GradeLabel || selectedOfflinePlayer.job2Grade || 0 }})</strong>
+                                            </div>
+                                            <div v-if="selectedOfflinePlayer.playerInfoFields && selectedOfflinePlayer.playerInfoFields.metadata_job && selectedOfflinePlayer.metadataJob" class="pp-info-item">
+                                                <span style="font-size:12px;">{{ t('ui_metadata_job') }}</span>
+                                                <strong style="font-size:13px;">{{ selectedOfflinePlayer.metadataJobLabel || selectedOfflinePlayer.metadataJob }} ({{ selectedOfflinePlayer.metadataJobGradeLabel || selectedOfflinePlayer.metadataJobGrade || 0 }})</strong>
+                                            </div>
+                                        </div>
+                                        <div class="pp-card" style="display:flex; flex-direction:column; gap:6px;">
+                                            <div class="pp-section-title"><i class="fas fa-history"></i> {{ t('ui_connection') }}</div>
+                                            <div class="pp-info-list" style="display:flex; flex-direction:column; justify-content:space-evenly; gap:4px;">
+                                                <div class="pp-info-item"><span style="font-size:12px;">{{ t('ui_last_seen') }}</span><strong style="font-size:13px;">{{ formatDateFull(selectedOfflinePlayer.last_seen) }}</strong></div>
+                                                <div class="pp-info-item"><span style="font-size:12px;">{{ t('ui_created_at') }}</span><strong style="font-size:13px;">{{ formatDateFull(selectedOfflinePlayer.created_at) }}</strong></div>
+                                                <div class="pp-info-item"><span style="font-size:12px;">{{ t('ui_playtime') }}</span><strong style="font-size:13px;">{{ formatPlaytime(selectedOfflinePlayer.playtime) }}</strong></div>
+                                                <div class="pp-info-item" style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+                                                    <span style="font-size:12px;">{{ t('ui_position') }}:</span>
+                                                    <div style="font-size:10px; color:rgba(255,255,255,0.6); background:rgba(0,0,0,0.15); padding:3px 6px; border-radius:4px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" class="mono" :title="formatPosition(selectedOfflinePlayer.position)">{{ formatPosition(selectedOfflinePlayer.position) }}</div>
+                                                    <i class="fas fa-copy pp-copy-icon" @click="copyToClipboard(formatPosition(selectedOfflinePlayer.position))" style="font-size:13px;"></i>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="pp-card" style="display:flex; flex-direction:column; gap:6px;">
+                                            <div class="pp-section-title"><i class="fas fa-chart-line"></i> {{ t('ui_analytics') }}</div>
+                                            <div class="pp-info-list" style="flex-direction:row; gap:6px;">
+                                                <div style="flex:1; background:rgba(245,158,11,0.05); padding:8px; border-radius:6px; text-align:center; border:1px solid rgba(245,158,11,0.1);">
+                                                    <div style="font-size:9px; color:var(--text-muted);">WARNS</div>
+                                                    <div style="font-size:16px; font-weight:800; color:var(--warning);">{{ selectedOfflinePlayer.warnsCount || 0 }}</div>
+                                                </div>
+                                                <div style="flex:1; background:rgba(239,68,68,0.05); padding:8px; border-radius:6px; text-align:center; border:1px solid rgba(239,68,68,0.1);">
+                                                    <div style="font-size:9px; color:var(--text-muted);">BANS</div>
+                                                    <div style="font-size:16px; font-weight:800; color:var(--danger);">{{ selectedOfflinePlayer.bansCount || 0 }}</div>
+                                                </div>
+                                                <div style="flex:1; background:rgba(59,130,246,0.05); padding:8px; border-radius:6px; text-align:center; border:1px solid rgba(59,130,246,0.1);">
+                                                    <div style="font-size:9px; color:var(--text-muted);">VEHICLES</div>
+                                                    <div style="font-size:16px; font-weight:800; color:var(--accent-light);">{{ selectedOfflinePlayer.vehiclesCount || 0 }}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="display:flex; flex-direction:column; gap:10px; min-height:0; overflow-y:auto;">
+                                        <div class="pp-card" style="display:flex; flex-direction:column; gap:6px;">
+                                            <div class="pp-section-title"><i class="fas fa-tools"></i> {{ t('ui_management') }}</div>
+                                            <div class="pp-mgmt-grid" style="flex:1; align-content:center;">
+                                                <div class="pp-mgmt-btn" :class="{ disabled: !myPermissions.offline_set_job }" @click="myPermissions.offline_set_job && (offlineActionModal = 'setjob')"><i class="fas fa-briefcase"></i><span>{{ t('ui_job') }}</span></div>
+                                                <div class="pp-mgmt-btn" :class="{ disabled: !myPermissions.offline_set_group }" @click="myPermissions.offline_set_group && (offlineActionModal = 'setgroup')"><i class="fas fa-users-cog"></i><span>{{ t('ui_group') }}</span></div>
+                                                <div class="pp-mgmt-btn" :class="{ disabled: !myPermissions.offline_give_item }" @click="myPermissions.offline_give_item && (offlineActionModal = 'giveitem')"><i class="fas fa-box"></i><span>{{ t('ui_add_item') }}</span></div>
+                                                <div class="pp-mgmt-btn" :class="{ disabled: !myPermissions.offline_give_vehicle }" @click="myPermissions.offline_give_vehicle && (offlineActionModal = 'spawnvehicle')"><i class="fas fa-car"></i><span>{{ t('ui_add_veh') }}</span></div>
+                                                <div class="pp-mgmt-btn" :class="{ disabled: !myPermissions.offline_set_position }" @click="myPermissions.offline_set_position && (offlineActionModal = 'setpos')"><i class="fas fa-map-marker-alt"></i><span>{{ t('ui_set_pos') }}</span></div>
+                                                <div class="pp-mgmt-btn" :class="{ disabled: !myPermissions.offline_set_money }" @click="myPermissions.offline_set_money && (offlineActionModal = 'setmoney')"><i class="fas fa-plus"></i><span>{{ t('ui_set_dollar') }}</span></div>
+                                                <div class="pp-mgmt-btn" :class="{ disabled: !myPermissions.offline_remove_money }" @click="myPermissions.offline_remove_money && (offlineActionModal = 'removemoney')"><i class="fas fa-minus"></i><span>{{ t('ui_rem_dollar') }}</span></div>
+                                                <div class="pp-mgmt-btn red" :class="{ disabled: !myPermissions.ban }" @click="myPermissions.ban && (offlineActionModal = 'ban')"><i class="fas fa-ban"></i><span>{{ t('ui_ban') }}</span></div>
+                                                <div class="pp-mgmt-btn orange" :class="{ disabled: !myPermissions.warn }" @click="myPermissions.warn && (offlineActionModal = 'warn')"><i class="fas fa-exclamation-triangle"></i><span>{{ t('ui_warn') }}</span></div>
+                                            </div>
+                                        </div>
+                                        <div class="pp-card" style="display:flex; flex-direction:column; gap:6px;">
+                                            <div class="pp-section-title"><i class="fas fa-id-card"></i> {{ t('ui_license') }}</div>
+                                            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                                                <div style="font-size:11px; color:rgba(255,255,255,0.6); word-break:break-all; background:rgba(0,0,0,0.2); padding:8px; border-radius:6px; flex:1;" class="mono">{{ selectedOfflinePlayer.identifier }}</div>
+                                                <i class="fas fa-copy pp-copy-icon" @click="copyToClipboard(selectedOfflinePlayer.identifier)" style="font-size:14px;"></i>
+                                            </div>
+                                        </div>
+                                        <div class="pp-card" style="display:flex; flex-direction:column; gap:6px; min-height:0;">
+                                            <div class="pp-section-title"><i class="fas fa-ban"></i> {{ t('ui_ban_history') }}</div>
+                                            <div class="pp-info-card pp-ban-list" style="margin-top: 4px; border: 1px solid rgba(255,255,255,0.05); background: transparent; display: flex; flex-direction: column; overflow-y: auto; gap: 4px; flex:1; min-height:0;">
+                                                <template v-if="selectedOfflinePlayer.bans && selectedOfflinePlayer.bans.length > 0">
+                                                    <div v-for="(ban, i) in selectedOfflinePlayer.bans" :key="i" class="pp-stat-row" style="flex-direction: column; align-items: flex-start; gap: 2px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                                        <div style="display:flex; justify-content: space-between; width: 100%;">
+                                                            <span class="label" style="max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" :title="ban.reason">{{ ban.reason }}</span>
+                                                            <span class="value" :class="ban.active ? 'red' : 'green'" style="font-size: 10px;">{{ ban.active ? t('ui_ban_active') : t('ui_ban_expired') }}</span>
+                                                        </div>
+                                                        <span style="font-size: 9px; color: rgba(255,255,255,0.4);">By: {{ ban.admin }}</span>
+                                                    </div>
+                                                </template>
+                                                <template v-else>
+                                                    <div style="display:flex; flex-direction:column; justify-content:center; align-items:center; height: 100%; min-height: 60px; color: rgba(255,255,255,0.3); font-size: 11px; gap: 6px;">
+                                                        <i class="fas fa-user-slash" style="font-size: 20px;"></i>
+                                                        <span style="font-size: 13px; font-weight: bold;">{{ t('ui_no_bans_record') }}</span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="pp-card" style="display:flex; flex-direction:column; gap:6px; min-height:0; overflow:hidden;">
+                                        <div class="pp-section-title" style="flex:0 0 auto;"><i class="fas fa-box"></i> {{ t('ui_inventory') }} <span style="font-size:10px; color:var(--text-muted); font-weight:400; margin-left:4px;">{{ selectedOfflinePlayer.inventory ? selectedOfflinePlayer.inventory.length : 0 }} {{ t('ui_items') }}</span></div>
+                                        <div style="display:flex; gap:6px; align-items:center; flex:0 0 auto;">
+                                            <input class="input-field" type="text" v-model="offlineInventorySearch" :placeholder="t('ui_search_items')" style="flex:1; padding:6px 10px; font-size:12px;" />
+                                            <select class="input-field" v-model="offlineInventorySort" style="width:auto; min-width:80px;">
+                                                <option value="none">Sort ▾</option>
+                                                <option value="label_asc">A → Z</option>
+                                                <option value="label_desc">Z → A</option>
+                                                <option value="count_desc">Qty ↓</option>
+                                                <option value="count_asc">Qty ↑</option>
+                                            </select>
+                                        </div>
+                                        <div style="flex:1; overflow-y:auto; min-height:0; margin-top:4px;">
+                                            <div v-if="filteredOfflineInventory.length > 0" class="inventory-grid">
+                                                <div class="inv-item" v-for="(item, i) in filteredOfflineInventory" :key="'offinv-' + i + '-' + (item.name || '')" style="position:relative;">
+                                                    <div v-if="myPermissions.offline_remove_item" @click.stop="offlineRemoveItemPrompt(item)" class="inv-remove-btn"><i class="fas fa-times"></i></div>
+                                                    <img v-if="item.image" :src="item.image" />
+                                                    <div v-else class="inv-placeholder"><i class="fas fa-question"></i></div>
+                                                    <span class="inv-name">{{ item.label || item.name }}</span>
+                                                    <span class="inv-count">x{{ item.count }}</span>
+                                                </div>
+                                            </div>
+                                            <p v-else class="empty-state" style="padding:16px 0;font-size:11px;">{{ t('ui_no_items_found') }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p v-else class="empty-state">{{ t('ui_loading_offline') }}</p>
+                        </template>
+                    </div>
+                </template>
+                <template v-if="tab === 'ban'">
+                    <div class="ap-content-header">
+                        <div><h2>{{ t('ui_ban_management') }}</h2><p>{{ bans.length }} {{ t('ui_active_bans_count') }}</p></div>
+                        <input class="input-field" v-model="banSearch" :placeholder="t('ui_search_bans')" style="width:180px;" />
+                    </div>
+                    <div class="ap-content-body">
+                        <div class="ban-list">
+                            <div v-for="ban in filteredBans" :key="ban.id" class="ban-item" :class="{'expired': !isBanActive(ban)}">
+                                <div class="flex items-center gap-3">
+                                    <div class="ban-icon" :class="{'green': !isBanActive(ban)}"><i class="fas" :class="isBanActive(ban) ? 'fa-ban' : 'fa-check-circle'"></i></div>
+                                    <div class="ban-info">
+                                        <div class="ban-name">{{ ban.name || ban.identifier }}</div>
+                                        <div class="ban-details">{{ ban.reason }} | By: {{ ban.banner_name }}</div>
+                                        <div v-if="ban.unbanned_by" class="ban-unban-info" style="font-size:11px;color:#10B981;margin-top:2px;">Unbanned by {{ ban.unbanned_by }} on {{ formatDateSeconds(ban.unban_date) }}</div>
+                                        <div v-else-if="!isBanActive(ban) && ban.expire > 0" class="ban-unban-info" style="font-size:11px;color:#10B981;margin-top:2px;">Expired on {{ formatDateSeconds(ban.expire) }}</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="badge" :class="isBanActive(ban) ? 'badge-red' : 'badge-green'">
+                                        {{ ban.unbanned_by ? 'Unbanned' : (ban.expire !== 0 && ban.expire < Math.floor(Date.now()/1000) ? 'Expired' : (ban.expire === 0 ? 'Permanent' : formatExpire(ban.expire))) }}
+                                    </span>
+                                    <button class="btn-action btn-ghost" @click="unbanPlayer(ban.id)" :disabled="!isBanActive(ban)" :style="{opacity: !isBanActive(ban) ? 0.5 : 1, cursor: !isBanActive(ban) ? 'not-allowed' : 'pointer'}">{{ t('ui_unban') }}</button>
+                                </div>
+                            </div>
+                        </div>
+                        <p v-if="filteredBans.length === 0" class="empty-state">{{ t('ui_no_bans_found') }}</p>
+                    </div>
+                </template>
+                <template v-if="tab === 'logs'">
+                    <div class="ap-content-header">
+                        <div><h2>{{ t('ui_action_logs') }}</h2><p>{{ t('ui_admin_history') }}</p></div>
+                        <button class="btn-action btn-ghost" @click="refreshLogs"><i class="fas fa-sync-alt"></i> {{ t('ui_refresh') }}</button>
+                    </div>
+                    <div class="ap-content-body">
+                        <div class="log-filters-row" style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center;">
+                            <select class="input-field" v-model="logFilter" style="width:auto; min-width:140px;">
+                                <option value="all">{{ t('ui_all_categories') }}</option>
+                                <option v-for="cat in logCategories" :key="cat" :value="cat">{{ getLogActionLabel(cat) }}</option>
+                            </select>
+                            <input class="input-field" type="text" v-model="logAdminSearch" :placeholder="t('ui_filter_by_admin')" style="width:160px; padding:6px 10px; font-size:12px;" />
+                            <input class="input-field" type="text" v-model="logTargetSearch" :placeholder="t('ui_filter_by_target')" style="width:160px; padding:6px 10px; font-size:12px;" />
+                            <input class="input-field" type="text" v-model="logActionSearch" :placeholder="t('ui_filter_by_action')" style="width:160px; padding:6px 10px; font-size:12px;" />
+                        </div>
+                        <div v-for="log in filteredLogs" :key="log.id" class="log-entry">
+                            <div class="log-icon" :style="getLogIconStyle(log.category)"><i class="fas fa-file-alt"></i></div>
+                            <div class="log-body">
+                                <h4>{{ getLogActionLabel(log.action) }}</h4>
+                                <p>{{ log.details }} {{ log.target_name ? '| Target: ' + log.target_name : '' }}</p>
+                                <p style="margin-top:3px;">Admin: {{ log.admin_name }}</p>
+                            </div>
+                            <span class="log-time">{{ formatTimestamp(log.timestamp) }}</span>
+                        </div>
+                        <p v-if="filteredLogs.length === 0" class="empty-state">{{ t('ui_no_logs_found') }}</p>
+                    </div>
+                </template>
+                <template v-if="tab === 'spectate'">
+                    <div class="ap-content-header"><div><h2>{{ t('ui_spectate_tab') }}</h2><p>{{ t('ui_watch_realtime') }}</p></div></div>
+                    <div class="ap-content-body">
+                        <div class="flex gap-2 mb-4" style="max-width:400px;">
+                            <input class="input-field" type="text" v-model="spectateSearch" :placeholder="t('ui_search_spectate')" style="flex:1;" />
+                            <button class="btn-action btn-primary" @click="doSpectate" :disabled="!spectatePreviewPlayer"><i class="fas fa-eye"></i> {{ t('ui_start') }}</button>
+                            <button class="btn-action btn-ghost" @click="doAction('stopspectate')"><i class="fas fa-eye-slash"></i> {{ t('ui_stop') }}</button>
+                        </div>
+                        <div v-if="spectatePreviewPlayer" class="player-list-item mb-4" style="max-width:400px;cursor:default;">
+                            <div class="flex items-center gap-3">
+                                <div class="player-avatar">
+                                    <img v-if="spectatePreviewPlayer.avatar" :src="spectatePreviewPlayer.avatar" />
+                                    <span v-else>{{ spectatePreviewPlayer.id }}</span>
+                                </div>
+                                <div><div class="player-name">{{ spectatePreviewPlayer.name }}</div><div class="player-meta">ID: {{ spectatePreviewPlayer.id }}</div></div>
+                            </div>
+                        </div>
+                        <div class="section-title mt-4">{{ t('ui_online_players') }}</div>
+                        <div class="player-list">
+                            <div v-for="p in filteredSpectatePlayers" :key="p.id" class="player-list-item" @click="spectateSearch = String(p.id)">
+                                <div class="flex items-center gap-3">
+                                    <div class="player-avatar">
+                                        <img v-if="p.avatar" :src="p.avatar" />
+                                        <span v-else>{{ p.id }}</span>
+                                    </div>
+                                    <span class="player-name">{{ p.playerName || p.name }} <span class="player-meta ml-2">(ID: {{ p.id }})</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <template v-if="tab === 'admins'">
+                    <div class="ap-content-header"><div><h2>{{ t('ui_online_admins') }}</h2><p>{{ onlineAdmins.length }} {{ t('ui_staff_online') }}</p></div></div>
+                    <div class="ap-content-body">
+                        <div class="player-list">
+                            <div v-for="admin in onlineAdmins" :key="admin.id" class="player-list-item" style="cursor:default;">
+                                <div class="flex items-center gap-3">
+                                    <div class="player-avatar" :style="{background: admin.avatar ? 'transparent' : getAdminColor(admin.group)}">
+                                        <img v-if="admin.avatar" :src="admin.avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                                        <span v-else>{{ admin.name ? admin.name.charAt(0).toUpperCase() : 'A' }}</span>
+                                    </div>
+                                    <div><div class="player-name">{{ admin.name }}</div><div class="player-meta">ID: {{ admin.id }} | {{ admin.group }}</div></div>
+                                </div>
+                                <span class="badge badge-blue">{{ admin.group }}</span>
+                            </div>
+                            <p v-if="onlineAdmins.length === 0" class="empty-state">{{ t('ui_no_admins_online') }}</p>
+                        </div>
+                    </div>
+                </template>
+                <template v-if="tab === 'staffchat'">
+                    <div class="ap-content-header"><div><h2>{{ t('ui_staff_chat_tab') }}</h2><p>{{ t('ui_internal_comms') }}</p></div></div>
+                    <div class="ap-content-body" style="display:flex;flex-direction:column;height:100%;padding-bottom:20px;">
+                        <div class="staff-chat-container">
+                            <div class="staff-chat-messages" ref="chatMessages">
+                                <div v-for="(msg, i) in staffMessages" :key="i" class="staff-msg">
+                                    <div class="msg-avatar" :style="{background: msg.avatar ? 'transparent' : (msg.color || 'linear-gradient(135deg,#3B82F6,#8B5CF6)')}">
+                                        <img v-if="msg.avatar" :src="msg.avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                                        <span v-else>{{ msg.name ? msg.name.charAt(0).toUpperCase() : 'A' }}</span>
+                                    </div>
+                                    <div class="msg-content">
+                                        <span class="msg-name" :style="{color: msg.color || '#E2E8F0'}">{{ msg.name }}</span>
+                                        <span class="badge badge-blue ml-2" style="font-size:9px;">{{ msg.group }}</span>
+                                        <p class="msg-text">{{ msg.text }}</p>
+                                        <p class="msg-time">{{ msg.time }}</p>
+                                    </div>
+                                </div>
+                                <p v-if="staffMessages.length === 0" class="empty-state">{{ t('ui_no_messages') }}</p>
+                            </div>
+                            <div class="staff-chat-input">
+                                <input class="input-field flex-1" v-model="chatInput" :placeholder="t('ui_type_message')" @keydown.enter="sendChatMessage" />
+                                <button class="btn-action btn-primary btn-sm" @click="sendChatMessage"><i class="fas fa-paper-plane"></i> {{ t('ui_send') }}</button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <template v-if="tab === 'vehicles'">
+                    <div class="ap-content-header">
+                        <div><h2>{{ t('ui_vehicle_management') }}</h2><p>{{ vehicles.length }} {{ t('ui_vehicles_registered') }}</p></div>
+                        <button class="btn-action btn-primary" @click="showAddVehicleModal = true"><i class="fas fa-plus"></i> {{ t('ui_add_vehicle') }}</button>
+                    </div>
+                    <div class="ap-content-body">
+                        <div class="vehicle-search-bar">
+                            <input class="input-field" v-model="vehicleSearch" :placeholder="t('ui_search_vehicles')" style="flex:1;max-width:300px;" />
+                            <button class="btn-action btn-ghost" @click="refreshVehicles"><i class="fas fa-sync-alt"></i> {{ t('ui_refresh') }}</button>
+                        </div>
+                        <table class="vehicle-table">
+                            <thead><tr><th>{{ t('ui_plate') }}</th><th>{{ t('ui_model') }}</th><th>{{ t('ui_owner') }}</th><th>{{ t('ui_actions') }}</th></tr></thead>
+                            <tbody>
+                                <tr v-for="v in filteredVehicles" :key="v.plate">
+                                    <td><span class="plate-badge">{{ v.plate }}</span></td>
+                                    <td>{{ v.vehicle || 'Unknown' }}</td>
+                                    <td>{{ v.owner_name || v.owner || 'Unknown' }}</td>
+                                    <td>
+                                        <div class="vehicle-actions">
+                                            <button class="btn-action btn-ghost" @click="openChangePlateModal(v)" title="Change Plate"><i class="fas fa-edit"></i></button>
+                                            <button class="btn-action btn-danger" @click="removeVehicle(v)" title="Remove"><i class="fas fa-trash"></i></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p v-if="filteredVehicles.length === 0" class="empty-state">{{ t('ui_no_vehicles_found') }}</p>
+                    </div>
+                </template>
+                <template v-if="tab === 'client_executor'">
+                    <div class="ap-content-header">
+                        <div><h2>{{ t('ui_client_executor') }}</h2><p>{{ t('ui_execute_client_lua') }}</p></div>
+                        <button class="btn-action btn-ghost" @click="clearConsole"><i class="fas fa-trash"></i> {{ t('ui_clear') }}</button>
+                    </div>
+                    <div class="ap-content-body" style="display:flex;flex-direction:column;height:100%;padding-bottom:20px;">
+                        <div class="console-output" ref="consoleOutput" style="flex:1;background:rgba(0,0,0,0.3);border-radius:6px;padding:10px;overflow-y:auto;font-family:monospace;margin-bottom:10px;font-size:13px;line-height:1.4;">
+                            <div v-for="(log, i) in consoleLogs" :key="i" class="console-line" v-html="log"></div>
+                        </div>
+                        <div class="console-input" style="display:flex;gap:10px;">
+                            <input class="input-field flex-1" v-model="consoleInput" placeholder="Enter Lua code..." @keydown.enter="executeClientCode" />
+                            <button class="btn-action btn-primary" @click="executeClientCode">{{ t('ui_execute') }}</button>
+                        </div>
+                    </div>
+                </template>
+                <template v-if="tab === 'manage_resources'">
+                    <div class="ap-content-header">
+                        <div><h2>{{ t('ui_resource_manager') }}</h2><p>{{ resources.length }} {{ t('ui_resources_found') }}</p></div>
+                        <button class="btn-action btn-ghost" @click="fetchResources"><i class="fas fa-sync-alt"></i> {{ t('ui_refresh') }}</button>
+                    </div>
+                    <div class="ap-content-body">
+                        <div style="margin-bottom:15px; display:flex; gap:10px;">
+                            <input class="input-field" v-model="resourceSearch" :placeholder="t('ui_search_resources')" style="flex:1;" />
+                        </div>
+                        <div class="resource-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:10px;">
+                            <div v-for="res in filteredResources" :key="res.name" class="resource-card" style="background:rgba(255,255,255,0.05);padding:12px;border-radius:6px;display:flex;justify-content:space-between;align-items:center;border:1px solid rgba(255,255,255,0.1);">
+                                <div style="overflow:hidden;margin-right:10px;">
+                                    <div style="font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;">{{ res.name }}</div>
+                                    <div style="font-size:11px;display:flex;align-items:center;gap:4px;">
+                                        <i class="fas fa-circle" style="font-size:6px;" :style="{color: res.state === 'started' ? '#10B981' : '#EF4444'}"></i>
+                                        <span :style="{color: res.state === 'started' ? '#10B981' : '#EF4444'}">{{ res.state.toUpperCase() }}</span>
+                                    </div>
+                                </div>
+                                <div class="resource-actions" style="display:flex;gap:5px;">
+                                    <template v-if="res.state === 'started'">
+                                        <button class="btn-action btn-sm btn-ghost" @click="manageResource(res.name, 'restart')" title="Restart"><i class="fas fa-redo"></i></button>
+                                        <button class="btn-action btn-sm btn-danger" @click="manageResource(res.name, 'stop')" title="Stop"><i class="fas fa-stop"></i></button>
+                                    </template>
+                                    <template v-else>
+                                        <button class="btn-action btn-sm btn-success" @click="manageResource(res.name, 'start')" title="Start"><i class="fas fa-play"></i></button>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+        <div v-if="showSendAnnouncementModal" class="modal-overlay" @click.self="showSendAnnouncementModal = false">
+            <div class="modal-box">
+                <h3><i class="fas fa-bullhorn"></i> {{ t('ui_send_announcement') }}</h3>
+                <input class="input-field w-full mb-3" v-model="announcementText" :placeholder="t('ui_msg_placeholder')" />
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="showSendAnnouncementModal = false">{{ t('ui_cancel') }}</button><button class="btn-action btn-primary" @click="sendAnnouncement">{{ t('ui_send') }}</button></div>
+            </div>
+        </div>
+        <div v-if="showBanModal" class="modal-overlay" @click.self="showBanModal = false">
+            <div class="modal-box">
+                <h3><i class="fas fa-ban"></i> {{ t('ui_ban_player') }}: {{ banForm.name }}</h3>
+                <div class="form-group"><div class="form-label">{{ t('ui_reason') }}</div><input class="input-field w-full" v-model="banForm.reason" :placeholder="t('ui_ban_reason')" /></div>
+                <div class="form-group"><div class="form-label">{{ t('ui_duration') }}</div><select class="input-field w-full" v-model="banForm.duration"><option v-for="opt in banDurations" :key="opt.seconds" :value="opt.seconds">{{ opt.label }}</option></select></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="showBanModal = false">{{ t('ui_cancel') }}</button><button class="btn-action btn-danger" @click="confirmBan">{{ t('ui_ban_player') }}</button></div>
+            </div>
+        </div>
+        <div v-if="showKickModal" class="modal-overlay" @click.self="showKickModal = false">
+            <div class="modal-box">
+                <h3><i class="fas fa-user-slash"></i> {{ t('ui_kick_player') }}</h3>
+                <div class="form-group"><div class="form-label">{{ t('ui_player_id') }}</div><input class="input-field w-full" type="number" v-model="kickForm.id" :placeholder="t('ui_player_id_num')" min="1" /></div>
+                <div class="form-group"><div class="form-label">{{ t('ui_reason') }}</div><input class="input-field w-full" v-model="kickForm.reason" :placeholder="t('ui_reason_kick')" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="showKickModal = false">{{ t('ui_cancel') }}</button><button class="btn-action btn-danger" @click="doKick" :disabled="!kickForm.id || !kickForm.reason"><i class="fas fa-user-slash"></i> {{ t('ui_kick') }}</button></div>
+            </div>
+        </div>
+        <div v-if="showKillModal" class="modal-overlay" @click.self="showKillModal = false">
+            <div class="modal-box">
+                <h3><i class="fas fa-skull"></i> {{ t('ui_kill_player') }}</h3>
+                <div class="form-group"><div class="form-label">{{ t('ui_player_id') }}</div><input class="input-field w-full" type="number" v-model="killTargetId" :placeholder="t('ui_player_id_num')" min="1" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="showKillModal = false">{{ t('ui_cancel') }}</button><button class="btn-action btn-danger" @click="doKillAction" :disabled="!killTargetId"><i class="fas fa-skull"></i> {{ t('ui_kill') }}</button></div>
+            </div>
+        </div>
+        <div v-if="showChangePlateModal" class="modal-overlay" @click.self="showChangePlateModal = false">
+            <div class="modal-box">
+                <h3><i class="fas fa-edit"></i> {{ t('ui_change_plate') }}</h3>
+                <div class="form-group"><div class="form-label">{{ t('ui_current_plate') }}</div><input class="input-field w-full" :value="changePlateData.oldPlate" disabled /></div>
+                <div class="form-group"><div class="form-label">{{ t('ui_new_plate') }}</div><input class="input-field w-full" v-model="changePlateData.newPlate" :placeholder="t('ui_new_plate_placeholder')" maxlength="8" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="showChangePlateModal = false">{{ t('ui_cancel') }}</button><button class="btn-action btn-primary" @click="doChangePlate">{{ t('ui_change') }}</button></div>
+            </div>
+        </div>
+        <div v-if="showAddVehicleModal" class="modal-overlay" @click.self="showAddVehicleModal = false">
+            <div class="modal-box">
+                <h3><i class="fas fa-plus-circle"></i> {{ t('ui_add_vehicle') }}</h3>
+                <div class="form-group"><div class="form-label">{{ t('ui_player_id') }}</div><input class="input-field w-full" v-model="addVehicleData.playerId" type="number" :placeholder="t('ui_player_id_num')" min="1" /></div>
+                <div class="form-group"><div class="form-label">{{ t('ui_vehicle_model') }}</div><input class="input-field w-full" v-model="addVehicleData.model" :placeholder="t('ui_vehicle_model_placeholder')" /></div>
+                <div class="form-group"><div class="form-label">{{ t('ui_plate') }}</div><input class="input-field w-full" v-model="addVehicleData.plate" :placeholder="t('ui_plate_placeholder')" maxlength="8" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="showAddVehicleModal = false">{{ t('ui_cancel') }}</button><button class="btn-action btn-primary" @click="doAddVehicle">{{ t('ui_add_vehicle') }}</button></div>
+            </div>
+        </div>
+        <div v-if="activeActionModal === 'setjob'" class="modal-overlay" @click.self="activeActionModal = null">
+            <div class="modal-box" style="width: 400px;">
+                <h3><i class="fas fa-briefcase"></i> {{ t('ui_set_job') }}</h3>
+                <div class="form-group">
+                    <div class="form-label">{{ t('ui_job_name') }}</div>
+                    <input class="input-field w-full" v-model="jobSearch" @focus="fetchJobs" :placeholder="t('ui_search_jobs')" />
+                    <div v-if="filteredJobs.length > 0" class="dropdown-list" style="max-height:200px;overflow-y:auto;background:rgba(0,0,0,0.3);margin-top:5px;border-radius:4px;border:1px solid rgba(255,255,255,0.1);">
+                        <div v-for="job in filteredJobs" :key="job.name" class="dropdown-item" @click="selectJob(job)" style="padding:8px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05);">
+                            {{ job.label }} <span style="font-size:10px;opacity:0.6;">({{ job.name }})</span>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="selectedJob" class="form-group">
+                    <div class="form-label">{{ t('ui_grade') }}</div>
+                    <select v-if="selectedJobGrades.length > 0" class="input-field w-full" v-model.number="actionForm.grade">
+                        <option v-for="g in selectedJobGrades" :key="g.grade" :value="g.grade">
+                            {{ g.label }} ({{ g.grade }})
+                        </option>
+                    </select>
+                    <input v-else class="input-field w-full" v-model.number="actionForm.grade" placeholder="Grade Number" type="number" />
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-action btn-ghost" @click="activeActionModal = null">{{ t('ui_cancel') }}</button>
+                    <button class="btn-action btn-primary" @click="doSetJob" :disabled="!actionForm.job">{{ t('ui_set_job') }}</button>
+                </div>
+            </div>
+        </div>
+        <div v-if="activeActionModal === 'setgroup'" class="modal-overlay" @click.self="activeActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-user-shield"></i> {{ t('ui_set_group') }}</h3>
+                <div class="form-group">
+                    <div class="form-label">{{ t('ui_group_name') }}</div>
+                    <select v-if="availableGroups && availableGroups.length > 0" class="input-field w-full" v-model="actionForm.group">
+                        <option value="" disabled selected>Select a group...</option>
+                        <option v-for="g in availableGroups" :key="g.name" :value="g.name">
+                            {{ g.label }} (Rank {{ g.rank }})
+                        </option>
+                    </select>
+                    <input v-else class="input-field w-full" v-model="actionForm.group" placeholder="Group Name (e.g. admin)" />
+                </div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="activeActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-primary" @click="doSetGroup">{{ t('ui_set_group') }}</button></div>
+            </div>
+        </div>
+        <div v-if="activeActionModal === 'setmoney'" class="modal-overlay" @click.self="activeActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-dollar-sign"></i> {{ t('ui_set_money') }}</h3>
+                <div class="form-group"><div class="form-label">{{ t('ui_type') }}</div><select class="input-field w-full" v-model="actionForm.moneyType"><option value="money">{{ t('ui_cash') }}</option><option value="bank">{{ t('ui_bank') }}</option><option value="black_money">{{ t('ui_black_money') }}</option></select></div>
+                <div class="form-group"><div class="form-label">{{ t('ui_amount') }}</div><input class="input-field w-full" v-model="actionForm.amount" :placeholder="t('ui_amount_placeholder')" type="number" min="0" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="activeActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-primary" @click="doSetMoney">{{ t('ui_apply') }}</button></div>
+            </div>
+        </div>
+        <div v-if="activeActionModal === 'removemoney'" class="modal-overlay" @click.self="activeActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-minus-circle"></i> {{ t('ui_remove_money') }}</h3>
+                <div class="form-group"><div class="form-label">{{ t('ui_type') }}</div><select class="input-field w-full" v-model="actionForm.moneyType"><option value="money">{{ t('ui_cash') }}</option><option value="bank">{{ t('ui_bank') }}</option><option value="black_money">{{ t('ui_black_money') }}</option></select></div>
+                <div class="form-group"><div class="form-label">{{ t('ui_amount') }}</div><input class="input-field w-full" v-model="actionForm.amount" :placeholder="t('ui_amount_placeholder')" type="number" min="0" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="activeActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-danger" @click="doRemoveMoney">{{ t('ui_remove') }}</button></div>
+            </div>
+        </div>
+        <div v-if="activeActionModal === 'giveitem'" class="modal-overlay" @click.self="activeActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-plus-circle"></i> {{ t('ui_give_item') }}</h3>
+                <div class="form-group"><input class="input-field w-full mb-2" v-model="itemSearch" :placeholder="t('ui_search_item')" /></div>
+                <div class="item-list-container" style="height:200px;overflow-y:auto;background:rgba(0,0,0,0.2);border-radius:6px;padding:4px;margin-bottom:12px;">
+                    <div v-for="(item, index) in filteredAllItems" :key="item.name + '-' + index" @click="selectItem(item)" class="item-list-row" :style="actionForm.itemName === item.name ? 'background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);' : ''" style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-radius:6px;border:1px solid transparent;transition:all 0.15s ease;margin-bottom:2px;">
+                        <img v-if="item.image" :src="item.image" style="width:32px;height:32px;object-fit:contain;" />
+                        <div style="flex:1;">
+                            <div style="font-weight:600;font-size:13px;color:white;">{{ item.label }}</div>
+                            <div style="font-size:10px;opacity:0.6;color:var(--text-muted);">{{ item.name }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group"><div class="form-label">{{ t('ui_count') }}</div><input class="input-field w-full" v-model="actionForm.itemCount" placeholder="1" type="number" min="1" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="activeActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-primary" @click="doGiveItem" :disabled="!actionForm.itemName">{{ t('ui_give') }}</button></div>
+            </div>
+        </div>
+        <div v-if="activeActionModal === 'dm'" class="modal-overlay" @click.self="activeActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-envelope"></i> {{ t('ui_direct_message') }}</h3>
+                <div class="form-group"><div class="form-label">{{ t('ui_message') }}</div><textarea class="input-field w-full" v-model="actionForm.dmMessage" :placeholder="t('ui_type_message_here')" rows="3"></textarea></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="activeActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-primary" @click="doSendDM">{{ t('ui_send') }}</button></div>
+            </div>
+        </div>
+        <div v-if="activeActionModal === 'removeitem_confirm'" class="modal-overlay" @click.self="activeActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-trash"></i> {{ t('ui_remove') }} {{ actionForm.itemLabel || actionForm.itemName }}?</h3>
+                <p style="margin-bottom:12px;color:var(--text-secondary);">{{ t('ui_remove_confirm') }}</p>
+                <div class="form-group"><div class="form-label">{{ t('ui_count') }} (Max: {{ actionForm.itemMax }})</div><input class="input-field w-full" v-model="actionForm.itemCount" type="number" min="1" :max="actionForm.itemMax" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="activeActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-danger" @click="doRemoveItemConfirm">{{ t('ui_confirm_remove') }}</button></div>
+            </div>
+        </div>
+        <div v-if="activeActionModal === 'warn'" class="modal-overlay" @click.self="activeActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-exclamation-triangle"></i> {{ t('ui_warn_player') }}</h3>
+                <div class="form-group"><div class="form-label">{{ t('ui_reason') }}</div><input class="input-field w-full" v-model="actionForm.warnReason" :placeholder="t('ui_warning_reason')" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="activeActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-danger" @click="doWarn">{{ t('ui_issue_warning') }}</button></div>
+            </div>
+        </div>
+        <div v-if="showScreenshotModal" class="modal-overlay" @click.self="showScreenshotModal = false" style="background:rgba(0,0,0,0.9);z-index:9999;">
+            <div class="screenshot-modal-box">
+                <div class="screenshot-modal-header">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <i class="fas fa-camera" style="color:var(--accent-light);"></i>
+                        <span style="font-weight:700;font-size:16px;color:white;">{{ t('ui_screenshot') }}</span>
+                    </div>
+                    <button class="btn-action btn-ghost" @click="showScreenshotModal = false" style="padding:6px 12px;font-size:12px;">
+                        <i class="fas fa-times"></i> {{ t('ui_close') || 'Close' }}
+                    </button>
+                </div>
+                <div class="screenshot-modal-body">
+                    <img v-if="screenshotImage" :src="screenshotImage" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.5);" />
+                    <div v-else style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:14px;">
+                        <i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i> Capturing...
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div v-if="offlineActionModal === 'setjob'" class="modal-overlay" @click.self="offlineActionModal = null">
+            <div class="modal-box" style="width: 400px;">
+                <h3><i class="fas fa-briefcase"></i> {{ t('ui_set_offline_job') }}</h3>
+                <div class="form-group">
+                    <div class="form-label">{{ t('ui_job_name') }}</div>
+                    <input class="input-field w-full" type="text" v-model="offlineJobSearch" :placeholder="t('ui_search_jobs')" />
+                    <div v-if="filteredOfflineJobs.length > 0" class="dropdown-list" style="max-height:200px;overflow-y:auto;background:rgba(0,0,0,0.3);margin-top:5px;border-radius:4px;border:1px solid rgba(255,255,255,0.1);">
+                        <div v-for="job in filteredOfflineJobs" :key="job.name" class="dropdown-item" @click="selectOfflineJob(job)" style="padding:8px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05);">
+                            {{ job.label }} <span style="font-size:10px;opacity:0.6;">({{ job.name }})</span>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="offlineActionForm.job" class="form-group">
+                    <div class="form-label">{{ t('ui_grade') }}</div>
+                    <select v-if="selectedOfflineJobGrades.length > 0" class="input-field w-full" v-model.number="offlineActionForm.grade">
+                        <option v-for="g in selectedOfflineJobGrades" :key="g.grade" :value="g.grade">
+                            {{ g.label }} ({{ g.grade }})
+                        </option>
+                    </select>
+                    <input v-else class="input-field w-full" v-model.number="offlineActionForm.grade" placeholder="Grade Number" type="number" />
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-action btn-ghost" @click="offlineActionModal = null">{{ t('ui_cancel') }}</button>
+                    <button class="btn-action btn-primary" @click="offlineDoSetJob" :disabled="!offlineActionForm.job">{{ t('ui_set_job') }}</button>
+                </div>
+            </div>
+        </div>
+        <div v-if="offlineActionModal === 'setgroup'" class="modal-overlay" @click.self="offlineActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-users-cog"></i> {{ t('ui_set_offline_group') }}</h3>
+                <div class="form-group">
+                    <div class="form-label">{{ t('ui_group_name') }}</div>
+                    <select v-if="availableGroups && availableGroups.length > 0" class="input-field w-full" v-model="offlineActionForm.group">
+                        <option value="" disabled selected>Select a group...</option>
+                        <option v-for="g in availableGroups" :key="g.name" :value="g.name">
+                            {{ g.label }} (Rank {{ g.rank }})
+                        </option>
+                    </select>
+                    <input v-else class="input-field w-full" v-model="offlineActionForm.group" placeholder="Group Name (e.g. admin)" />
+                </div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="offlineActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-primary" @click="offlineDoSetGroup">{{ t('ui_set_group') }}</button></div>
+            </div>
+        </div>
+        <div v-if="offlineActionModal === 'setmoney'" class="modal-overlay" @click.self="offlineActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-dollar-sign"></i> {{ t('ui_set_offline_money') }}</h3>
+                <div class="form-group"><div class="form-label">{{ t('ui_type') }}</div><select class="input-field w-full" v-model="offlineActionForm.moneyType"><option value="money">{{ t('ui_cash') }}</option><option value="bank">{{ t('ui_bank') }}</option><option value="black_money">{{ t('ui_black_money') }}</option></select></div>
+                <div class="form-group"><div class="form-label">{{ t('ui_amount') }}</div><input class="input-field w-full" v-model.number="offlineActionForm.amount" :placeholder="t('ui_amount_placeholder')" type="number" min="0" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="offlineActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-primary" @click="offlineDoSetMoney">{{ t('ui_apply') }}</button></div>
+            </div>
+        </div>
+        <div v-if="offlineActionModal === 'removemoney'" class="modal-overlay" @click.self="offlineActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-minus-circle"></i> {{ t('ui_remove_offline_money') }}</h3>
+                <div class="form-group"><div class="form-label">{{ t('ui_type') }}</div><select class="input-field w-full" v-model="offlineActionForm.moneyType"><option value="money">{{ t('ui_cash') }}</option><option value="bank">{{ t('ui_bank') }}</option><option value="black_money">{{ t('ui_black_money') }}</option></select></div>
+                <div class="form-group"><div class="form-label">{{ t('ui_amount') }}</div><input class="input-field w-full" v-model.number="offlineActionForm.amount" :placeholder="t('ui_amount_placeholder')" type="number" min="0" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="offlineActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-danger" @click="offlineDoRemoveMoney">{{ t('ui_remove') }}</button></div>
+            </div>
+        </div>
+        <div v-if="offlineActionModal === 'ban'" class="modal-overlay" @click.self="offlineActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-ban"></i> {{ t('ui_offline_ban') }}</h3>
+                <div class="form-group"><div class="form-label">{{ t('ui_reason') }}</div><input class="input-field w-full" v-model="offlineActionForm.reason" :placeholder="t('ui_ban_reason')" /></div>
+                <div class="form-group"><div class="form-label">{{ t('ui_duration') }}</div><select class="input-field w-full" v-model="offlineActionForm.duration"><option v-for="opt in banDurations" :key="opt.seconds" :value="opt.seconds">{{ opt.label }}</option></select></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="offlineActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-danger" @click="offlineDoBan">{{ t('ui_ban_player') }}</button></div>
+            </div>
+        </div>
+        <div v-if="offlineActionModal === 'warn'" class="modal-overlay" @click.self="offlineActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-exclamation-triangle"></i> {{ t('ui_offline_warn') }}</h3>
+                <div class="form-group"><div class="form-label">{{ t('ui_reason') }}</div><input class="input-field w-full" v-model="offlineActionForm.reason" :placeholder="t('ui_warning_reason')" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="offlineActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-primary" @click="offlineDoWarn">{{ t('ui_issue_warning') }}</button></div>
+            </div>
+        </div>
+        <div v-if="offlineActionModal === 'giveitem'" class="modal-overlay" @click.self="offlineActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-box"></i> {{ t('ui_add_item') }}</h3>
+                <div class="form-group"><input class="input-field w-full mb-2" v-model="offlineItemSearch" :placeholder="t('ui_search_item')" /></div>
+                <div class="item-list-container" style="height:200px;overflow-y:auto;background:rgba(0,0,0,0.2);border-radius:6px;padding:4px;margin-bottom:12px;">
+                    <div v-for="item in filteredOfflineAllItems" :key="item.name" @click="selectOfflineItem(item)" class="item-list-row" :style="offlineActionForm.itemName === item.name ? 'background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);' : ''" style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-radius:6px;border:1px solid transparent;transition:all 0.15s ease;margin-bottom:2px;">
+                        <img v-if="item.image" :src="item.image" style="width:32px;height:32px;object-fit:contain;" />
+                        <div style="flex:1;">
+                            <div style="font-weight:600;font-size:13px;color:white;">{{ item.label }}</div>
+                            <div style="font-size:10px;opacity:0.6;color:var(--text-muted);">{{ item.name }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group"><div class="form-label">{{ t('ui_amount') }}</div><input class="input-field w-full" type="number" v-model.number="offlineActionForm.amount" :placeholder="t('ui_amount_placeholder')" min="1" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="offlineActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-primary" @click="offlineDoGiveItem" :disabled="!offlineActionForm.itemName">{{ t('ui_add') }}</button></div>
+            </div>
+        </div>
+        <div v-if="offlineActionModal === 'spawnvehicle'" class="modal-overlay" @click.self="offlineActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-car"></i> {{ t('ui_add_vehicle') }}</h3>
+                <div class="form-group"><div class="form-label">{{ t('ui_vehicle_model') }}</div><input class="input-field w-full" v-model="offlineActionForm.vehicleModel" :placeholder="t('ui_vehicle_model_short')" /></div>
+                <div class="form-group"><div class="form-label">{{ t('ui_custom_plate') }}</div><input class="input-field w-full" v-model="offlineActionForm.plate" :placeholder="t('ui_custom_plate_placeholder')" maxlength="8" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="offlineActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-primary" @click="offlineDoSpawnVehicle" :disabled="!offlineActionForm.vehicleModel">{{ t('ui_add') }}</button></div>
+            </div>
+        </div>
+        <div v-if="offlineActionModal === 'setpos'" class="modal-overlay" @click.self="offlineActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-map-marker-alt"></i> {{ t('ui_set_offline_position') }}</h3>
+                <div class="form-group">
+                    <div class="form-label">{{ t('ui_coordinates') }}</div>
+                    <div style="display:flex; gap:6px;">
+                        <input class="input-field w-full" type="number" step="0.01" v-model.number="offlineActionForm.coords.x" placeholder="X" />
+                        <input class="input-field w-full" type="number" step="0.01" v-model.number="offlineActionForm.coords.y" placeholder="Y" />
+                        <input class="input-field w-full" type="number" step="0.01" v-model.number="offlineActionForm.coords.z" placeholder="Z" />
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-action btn-ghost" @click="offlineActionModal = null">{{ t('ui_cancel') }}</button>
+                    <button class="btn-action btn-ghost" style="color: #60a5fa; border-color: rgba(96, 165, 250, 0.3);" @click="getAdminPos"><i class="fas fa-crosshairs"></i> {{ t('ui_get_my_pos') }}</button>
+                    <button class="btn-action btn-primary" @click="offlineDoSetPos">{{ t('ui_update') }}</button>
+                </div>
+            </div>
+        </div>
+        <div v-if="offlineActionModal === 'removeitem'" class="modal-overlay" @click.self="offlineActionModal = null">
+            <div class="modal-box">
+                <h3><i class="fas fa-trash-alt"></i> {{ t('ui_remove_item') }}</h3>
+                <p style="margin-bottom:12px; color:var(--text-muted); font-size:13px;">How many <strong>{{ offlineActionForm.itemLabel }}</strong> do you want to remove?</p>
+                <div class="form-group"><div class="form-label">Amount (Max: {{ offlineActionForm.itemMax }})</div><input class="input-field w-full" type="number" v-model.number="offlineActionForm.amount" min="1" :max="offlineActionForm.itemMax" /></div>
+                <div class="modal-actions"><button class="btn-action btn-ghost" @click="offlineActionModal = null">{{ t('ui_cancel') }}</button><button class="btn-action btn-danger" @click="offlineDoRemoveItem">{{ t('ui_remove') }}</button></div>
+            </div>
+        </div>
+    </div>
+    </script>
+    <script src="./index.js"></script>
+    <div id="controls-overlay"
+        style="display:none; position:fixed; bottom:28px; left:50%; transform:translateX(-50%); z-index:99999; pointer-events:none;">
+        <div
+            style="background:linear-gradient(135deg, rgba(15,20,35,0.95), rgba(10,14,28,0.97)); border:1px solid rgba(59,130,246,0.15); border-radius:12px; padding:12px 20px; display:flex; align-items:center; gap:20px; font-family:'Inter','Segoe UI',sans-serif; box-shadow:0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04);">
+            <div id="controls-overlay-mode"
+                style="font-size:12px; font-weight:700; letter-spacing:0.5px; display:flex; align-items:center; gap:6px; white-space:nowrap;">
+            </div>
+            <div style="width:1px; height:20px; background:rgba(255,255,255,0.08);"></div>
+            <div id="controls-overlay-keys"
+                style="display:flex; align-items:center; gap:14px; font-size:11px; color:rgba(255,255,255,0.6);"></div>
+        </div>
+    </div>
+</body>
+</html>
