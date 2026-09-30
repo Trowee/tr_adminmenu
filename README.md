@@ -2,6 +2,9 @@
 
 A clean, modern, and optimized admin menu for FiveM, fully compatible with ESX, QBCore, and QBox frameworks. Built for speed, reliability, and ease of use, making server administration simpler than ever.
 
+-- Low res preview, full res at forum
+Preview: https://albumizr.com/a/F0s0
+
 ## Features
 - **Multi-Framework Support:** ESX, QBCore, QBox.
 - **Inventory Integration:** Supports `ox_inventory`, `qb-inventory`, `qs-inventory`, and `core_inventory`.
